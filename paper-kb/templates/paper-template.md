@@ -10,6 +10,7 @@ level: 1  # 1: 快速索引 | 2: 方法拆解 | 3: 完整分析
 status: read  # read | skimmed | to-read
 importance: medium  # high | medium | low
 problem_tree_nodes: []  # 关联的问题树节点 ID, 如 [Uni-1b, Tok-2a]
+aliases: []  # 论文简称，方便用 [[简称]] 引用
 ---
 
 <!-- ==================== Level 1: 快速索引 (必填, 5min) ==================== -->
@@ -21,7 +22,7 @@ problem_tree_nodes: []  # 关联的问题树节点 ID, 如 [Uni-1b, Tok-2a]
 <!-- 这篇论文最本质的洞察是什么？为什么 work？ -->
 
 ## 与已有工作的关系
-<!-- 简要标注和知识库中已有论文的关系 -->
+<!-- 简要标注和知识库中已有论文的关系，使用 [[论文文件名]] wiki link 格式 -->
 - **继承自**:
 - **对比**:
 - **互补**:
@@ -58,12 +59,9 @@ problem_tree_nodes: []  # 关联的问题树节点 ID, 如 [Uni-1b, Tok-2a]
 
 ## Relations (结构化)
 <!-- Agent 用于构建关系网络。type: extends | alternative_to | combines_with | motivated_by | enables | conflicts_with -->
-```yaml
-relations:
-  - type:
-    target: ""  # 知识库中的论文文件名(不含.md)
-    detail: ""
-```
+<!-- 格式: `type` → [[论文文件名]]: 说明 -->
+-
+-
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 
@@ -77,8 +75,8 @@ relations:
   - 潜在思路:
 
 ### 对问题树的推进
-<!-- 这篇论文推进了哪些问题树节点？打开了什么新问题？ -->
-- 推进了 [节点ID]:
+<!-- 这篇论文推进了哪些问题树节点？打开了什么新问题？使用 [[problem-tree#节点标题]] 链接 -->
+- 推进了:
 - 新增问题:
 
 ## 个人深度评注

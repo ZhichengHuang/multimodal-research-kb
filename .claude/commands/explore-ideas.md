@@ -21,6 +21,11 @@
 4. **失败记录**: 搜索相关论文中的 anti-patterns 和 `problems/solved-log.md` 中的经验
 5. **已有 ideas**: 检查 `paper-kb/ideas/` 中是否有相关的已有构想
 
+**Obsidian CLI 增强** (如果 `obsidian` CLI 可用):
+- `obsidian search "<problem keywords>"` — 全库语义搜索
+- `obsidian backlinks <related-paper>` — 从相关论文的引用网络出发探索
+- `obsidian links <related-paper>` — 追踪论文引用链
+
 ## Step 3: 方案生成
 
 基于检索结果，生成 2-3 个候选算法方案。每个方案包含:

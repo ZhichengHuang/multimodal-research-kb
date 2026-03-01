@@ -34,6 +34,11 @@
 5. **已有构想**:
    - `paper-kb/ideas/` 中相关的已有想法
 
+**Obsidian CLI 增强** (如果 `obsidian` CLI 可用):
+- `obsidian search "<problem keywords>"` — 全库语义搜索
+- `obsidian backlinks <related-paper>` — 从相关论文的引用网络出发探索
+- `obsidian links <related-paper>` — 追踪论文引用链
+
 ## Step 3: 现有方案分析
 
 整理已有解决方案的全景:

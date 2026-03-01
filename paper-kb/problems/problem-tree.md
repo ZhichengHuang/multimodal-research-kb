@@ -17,7 +17,7 @@
   - 冻结: 训练效率高，但 encoder 表征不一定对齐 LLM
   - 联合训练: 效果更好但成本高，scaling 行为不明确
   - 已有尝试:
-  - 相关论文:
+  - 相关论文: [[2026-LaViDa-R1]]
 - [PT-1b] 🔴 视觉 token 数量与性能的 tradeoff
   - 高分辨率需要大量 token → 计算成本
   - 压缩策略 (Perceiver, pooling) vs 保留细节
@@ -76,19 +76,36 @@
   - 已有尝试:
   - 相关论文:
 - [RL-1b] 🔴 VLM-as-judge 的可靠性如何？
-  - 已有尝试:
-  - 相关论文:
+  - 已有尝试: LaViDa-R1 报告 UnifiedReward-Qwen-7B 会幻觉出错误评判标准
+  - 相关论文: [[2026-LaViDa-R1]]
 - [RL-1c] 🔴 生成任务 (图/视频) 的 reward 如何定义？→ 连接到 [Uni-5b]
-  - 已有尝试:
-  - 相关论文:
+  - 已有尝试: MMaDA 用 CLIP+ImageReward, LaViDa-R1 用 EditScore
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
+- [RL-1d] 🔴 T2I Compositional Reasoning Reward Model 空白
+  - CLIP-based reward 无法评估空间关系、属性绑定、多对象计数等 compositional 能力
+  - VLM-as-judge 有幻觉风险，现有 reward model 均不支持需要逻辑推理的 T2I prompt
+  - 已有尝试: MMaDA GenEval Position 仅 0.20 暴露了此缺口; LaViDa-R1 废弃 PickScore
+  - 潜在思路: 训练 compositional reasoning-aware reward model, 或使用 frontier VLM (成本高)
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 
 #### [RL-2] 🔴 GRPO/PPO 如何适配多模态？
-- [RL-2a] 🔴 多模态采样的成本远高于纯文本，如何降低？
+- [RL-2a] 🟡 多模态采样的成本远高于纯文本，如何降低？
+  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 - [RL-2b] 🔴 Group 构造: 同一图不同回答 vs 不同图？
+- [RL-2c] 🔴 高熵 token 分布下的 RL 正则化
+  - MMaDA 保留 KL penalty, LaViDa-R1 发现 image token NLL>6 导致 KL estimator 方差极大、训练发散
+  - LaViDa-R1 用 SFT loss 替代 KL 作为隐式正则化，有效但理论不完备
+  - 根本问题: KL 约束对 dLLM 的高熵离散分布是否根本不合适？
+  - 潜在思路: 分 token 类型加权 KL, entropy-aware clipping, 理论推导最优正则化形式
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 
 #### [RL-3] 🔴 RL 能提升多模态推理能力吗？
-- [RL-3a] 🔴 视觉推理 (图表/几何) 的 verifiable reward
+- [RL-3a] 🟡 视觉推理 (图表/几何) 的 verifiable reward
+  - 已有尝试: MMaDA 对 GeoQA/CLEVR 用 correctness+CLIP reward, UniGRPO 提升 GSM8K +8.2; LaViDa-R1 在 MathVista +2.4
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 - [RL-3b] 🔴 RL 对 grounding 能力的影响
+  - 相关论文: [[2026-LaViDa-R1]]
 
 ---
 
@@ -100,16 +117,16 @@
   - 但与 AR 框架的兼容性分别如何？
   - 已有尝试:
   - 相关论文:
-- [Diff-1b] 🔴 连续扩散 vs 离散扩散 (Masked Diffusion)
+- [Diff-1b] 🟡 连续扩散 vs 离散扩散 (Masked Diffusion)
   - 离散扩散和 LLM 的 token 框架天然对齐
   - 连续扩散保留更多信息但需要架构改造
-  - 已有尝试:
-  - 相关论文:
+  - 已有证据: MMaDA 和 LaViDa 系列均验证离散 masked diffusion 在统一模型中可行且 competitive，连续扩散在统一场景中尚无可比工作
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 - [Diff-1c] 🔴 采样效率: 如何在统一模型中减少 diffusion 步数
   - Consistency model / distillation 是否适用
   - Few-step generation 对理解能力的影响
-  - 已有尝试:
-  - 相关论文:
+  - 已有尝试: MMaDA 用 50 步（vs 1024）图像生成保持强性能，文本/理解可用 1/2-1/4 步数
+  - 相关论文: [[2025-MMaDA]]
 
 #### [Diff-2] 🔴 Diffusion 骨干架构演进
 - [Diff-2a] 🔴 DiT 成功的本质原因？Transformer 替代 UNet 的关键
@@ -146,6 +163,11 @@
   - 分层表示: 高层语义 + 底层细节
   - 已有尝试:
   - 相关论文:
+- [Tok-2d] 🔴 MAGVIT-v2 是否是当前 dLLM 统一模型生成质量的主要瓶颈？
+  - MMaDA 和 LaViDa-O 都使用 MAGVIT-v2 (codebook 8192, 512×512), 两者 T2I 均与 FLUX/SD3 有明显差距
+  - 需区分: 多少差距来自 tokenizer 信息损失 vs 模型容量/训练数据不足
+  - 潜在思路: 在 MMaDA/LaViDa 框架中替换为更强 tokenizer (BSQ/LFQ) 做消融实验
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 
 #### [Tok-3] 🔴 Tokenizer 对下游训练的影响
 - [Tok-3a] 🔴 Tokenizer 质量对生成质量的上界限制
@@ -160,9 +182,9 @@
   - AR+Diffusion (Transfusion, MetaMorph): 灵活, 各取所长, 但训练目标不统一
   - 纯AR离散化 (Chameleon, Emu3): 框架统一优雅, 但视觉离散化有损
   - 解耦编码 (Janus, SEED): 实用, 避免冲突, 但不够"统一"
-  - Diffusion原生: 理论优美, 但文本处理不是 diffusion 强项
-  - 已有尝试:
-  - 相关论文:
+  - Diffusion原生: MMaDA 首次在 NeurIPS 级别验证 8B 规模可行，证伪风险降低
+  - 已有尝试: MMaDA (diffusion-native 三任务 competitive), LaViDa-R1 (grounding specialist level)
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 - [Uni-1b] 🔴 AR + Diffusion 的融合细节
   - 在哪一层融合？token level vs feature level
   - Loss 权重如何平衡？动态 vs 静态
@@ -178,10 +200,12 @@
   - 能否在解耦基础上逐步走向统一？
 
 #### [Uni-2] 🔴 理解与生成的能力关系
-- [Uni-2a] 🔴 共享参数下能力是否冲突？
-  - 实验证据: 统一训练后理解能力下降多少？
-  - 是否存在 mutual benefit？生成能力帮助理解？
+- [Uni-2a] 🟡 共享参数下能力是否冲突？
+  - 实验证据: MMaDA Figure 6 显示 Mixed CoT 训练中三项任务指标同步提升，无 seesaw 效应
+  - 是否存在 mutual benefit？MMaDA 和 LaViDa-R1 均观察到跨模态正向协同
+  - 但仅在 8-10B 规模验证，更大规模行为未知
   - → 连接到 [Diff-2c]
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
 - [Uni-2b] 🔴 MoE / Routing 解耦是否可行？
   - 部分参数共享 + 部分专用
   - 路由策略如何设计
@@ -204,10 +228,19 @@
 - [Uni-4c] 🔴 视频理解和生成的统一是否比图像更难？
 - [Uni-4d] 🔴 世界模型视角: 视频生成 = 物理规律学习？
 
-#### [Uni-5] 🔴 统一模型的 Post-training 和 RL
-- [Uni-5a] 🔴 统一模型如何做 alignment？
+#### [Uni-5] 🟡 统一模型的 Post-training 和 RL
+- [Uni-5a] 🟡 统一模型如何做 alignment？
   - 理解和生成分别对齐 vs 联合对齐
-- [Uni-5b] 🔴 统一模型的 reward 如何设计？→ 连接到 [RL-1c]
+  - 已有方案: MMaDA 提供首个 diffusion-native 全链路（预训练→Mixed CoT SFT→UniGRPO RL）; LaViDa-R1 提供统一 PG 框架（SFT+GRPO+self-distillation）
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
+- [Uni-5b] 🟡 统一模型的 reward 如何设计？→ 连接到 [RL-1c]
   - 理解正确性 + 生成质量 + 一致性 的多目标 reward
-- [Uni-5c] 🔴 RL 是否能促进理解-生成的协同？
+  - 已有方案: MMaDA Diversified Reward (correctness/format/CLIP/ImageReward), LaViDa-R1 Multi-Reward (correctness/IoU/EditScore)
+  - 已发现局限: CLIP reward 不支持 compositional reasoning → 连接到 [RL-1d]
+  - "一致性" 维度仍完全未被探索
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]
+- [Uni-5c] 🟡 RL 是否能促进理解-生成的协同？
   - 假设: RL 优化"看图生图"任务可能同时提升两种能力
+  - 已有证据: MMaDA UniGRPO 同时提升 GSM8K (推理) 和 ImageReward (生成); LaViDa-R1 多任务 RL 各任务均有提升
+  - 但机制不清晰: 是共享表示的迁移还是任务间正则化？
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]]

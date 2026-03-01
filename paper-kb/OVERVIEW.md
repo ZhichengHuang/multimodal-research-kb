@@ -43,6 +43,42 @@
 1. `/update-kb` — 扫描知识库，更新跨论文关联、经验规律和问题树状态
 
 ## 统计信息
-- 论文总数: 0
-- Level 1: 0 | Level 2: 0 | Level 3: 0
-- 最后更新: -
+- 论文总数: 2
+- Level 1: 0 | Level 2: 1 | Level 3: 1
+- 最后更新: 2026-03-01
+
+---
+
+## 动态视图 (需 Dataview 插件)
+
+### 所有论文按重要性排列
+```dataview
+TABLE level as "Level", importance as "重要性", status as "状态", category as "分类", date as "日期"
+FROM "paper-kb/papers"
+SORT importance DESC, date DESC
+```
+
+### 待读论文
+```dataview
+LIST
+FROM "paper-kb/papers"
+WHERE status = "to-read"
+SORT date DESC
+```
+
+### 高重要性论文
+```dataview
+TABLE tags as "标签", file.inlinks as "被引用"
+FROM "paper-kb/papers"
+WHERE importance = "high"
+SORT date DESC
+```
+
+### Tag 统计
+```dataview
+TABLE length(rows) as "论文数"
+FROM "paper-kb/papers"
+FLATTEN tags as tag
+GROUP BY tag
+SORT length(rows) DESC
+```

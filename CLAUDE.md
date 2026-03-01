@@ -30,9 +30,19 @@
 - Level 2 (15min): 方法拆解，Building Blocks含mechanism+适用条件+失败模式
 - Level 3 (30min): 完整分析，问题定位+个人评注
 - Building Block 必须包含 WHY it works（机制层描述）
+- Frontmatter 必须包含 `aliases` 字段（论文简称）
+- 所有论文引用使用 `[[]]` wiki link 格式（包括 KB 中尚不存在的外部论文）
+- Relations 格式: `` `type` → [[论文文件名]]: 说明 ``（不使用 YAML 代码块）
+- 问题树链接使用 `[[problem-tree#节点标题]]` 格式
 
 ## Agent 工作原则
 - 生成方案时必须基于知识库中的已有 Building Blocks，注明出处
 - 明确区分"有论文支持的结论"和"推测性判断"
 - 关注 anti-patterns 和失败模式，避免提出已被证伪的方案
 - 组合 blocks 时需分析机制层面的兼容性
+
+## Obsidian 集成
+- Vault 根目录为项目根目录 `multimodal-research-kb/`
+- 如果 `obsidian` CLI 可用，自定义命令会使用 CLI 做增强检索和健康检查
+- CLI 为可选增强，所有命令在无 CLI 时仍可正常工作
+- OVERVIEW.md 包含 Dataview 查询块，需安装 Dataview 社区插件才能渲染
