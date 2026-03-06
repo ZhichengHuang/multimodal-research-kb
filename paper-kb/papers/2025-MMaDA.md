@@ -119,6 +119,11 @@ aliases: [MMaDA, UniGRPO]
 - `alternative_to` → [[Transfusion]]: 统一模型路线之争——纯 diffusion vs AR+Diffusion 混合
 - `motivated_by` → [[DeepSeek-R1]]: GRPO 算法的原始来源，CoT 推理范式
 - `combines_with` → [[MAGVIT-v2]]: 使用其 tokenizer 作为视觉离散化方案
+- `extends` → [[2025-MMaDA-Parallel]]: MMaDA-Parallel 是 MMaDA 的直接改进版本，从 sequential 推理-生成转为 parallel 架构
+- `enables` → [[2025-dMLLM-TTS]]: dMLLM-TTS 在 MMaDA 上应用 test-time scaling，GenEval 0.51→0.66 (+29.4%)
+- `alternative_to` → [[2025-SDAR-VL]]: 同为 dLLM 多模态模型——标准 masked diffusion+UniGRPO RL vs 块状扩散+ABNS/EMRS/PBNC 训练稳定性优化
+- `combines_with` → [[2026-EBPO]]: EBPO 的 shrinkage baseline 可直接替换 UniGRPO 中的 GRPO baseline 估计，解决"训练信号消失问题未解决"
+- `alternative_to` → [[2026-Beyond-LM]]: 统一模型路线之争——LLaDA 初始化纯离散扩散 + 模态无关全共享 vs 从零训练 AR+连续扩散混合 + modality-specific FFN + MoE
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

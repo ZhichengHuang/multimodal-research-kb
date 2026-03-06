@@ -109,6 +109,9 @@ dLLM 的双向生成能力（bidirectional inpainting）不仅是推理时的优
 - `alternative_to` → [[2025-MMaDA]]: 同为多模态 dLLM RL；LaViDa-R1 引入 answer-forcing（解决训练信号消失）、tree search（diffusion 中间状态搜索）、统一 SFT-RL loss（替代 KL 正则化）三个 MMaDA 未解决的问题；LaViDa-R1 晚 9 个月，以 MMaDA 为基线
 - `combines_with` → [[EditScore]]: 使用 EditScore 作为 image editing 的 reward model
 - `motivated_by` → [[DeepSeek-R1]]: 将 LLM reasoning (GRPO) 的思路扩展到 dLLM
+- `alternative_to` → [[2026-EBPO]]: 两者解决训练信号消失的方式正交——LaViDa-R1 用 answer-forcing 生成正向样本（dLLM inpainting），EBPO 用 shrinkage baseline 从全失败 group 提取负向梯度（统计方法）；可叠加使用
+- `combines_with` → [[2025-dMLLM-TTS]]: dMLLM-TTS 的 test-time scaling（HTS 搜索）可在 LaViDa-R1 训练后进一步提升推理质量；LaViDa-R1 的 tree search 是训练时探索，dMLLM-TTS 是推理时搜索
+- `combines_with` → [[2025-SDAR-VL]]: SDAR-VL 的块状扩散训练稳定性优化（ABNS/EMRS/PBNC）可迁移到 LaViDa-R1 骨干的预训练阶段
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 
