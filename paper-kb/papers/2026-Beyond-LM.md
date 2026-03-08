@@ -121,6 +121,7 @@ aliases: ["Beyond-LM", "Multimodal-Pretraining-Scratch"]
 - `combines_with` → [[2026-LaViDa-R1]]: 预训练发现（视觉:语言 51:1，MoE 缩小扩展律差距）可指导 LaViDa-R1 的多任务 RL 数据配比和架构改进
 - `conflicts_with` → [[2025-MMaDA]] / [[2025-Lumina-DiMOO]] / [[2026-LaViDa-R1]]: 根本性路线冲突——连续扩散 (flow matching) vs 离散扩散 (masked diffusion)；代表 Diffusion 原生路线中的"连续 vs 离散"分歧
 - `conflicts_with` → [[2025-DiffusionVL]]: 路线对立——Beyond-LM 从零训练证明扩散训练本身的价值 vs DiffusionVL 用 AR 初始化"免费"继承知识再做扩散微调；Beyond-LM 提供了 DiffusionVL 无法提供的"公平对比基准"
+- `alternative_to` → [[2025-KimiK2.5]]: 同为大规模 MoE 多模态预训练，但路线相反——Beyond-LM 从零训练+连续扩散+51:1 视觉:语言数据需求 vs K2.5 基于已有 K2 骨干+AR 自回归+10% 恒定视觉比例
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

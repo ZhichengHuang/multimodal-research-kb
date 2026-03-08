@@ -15,12 +15,12 @@
 
 ---
 
-### [P-Uni-01] Masked Diffusion 统一框架下的跨模态训练产生正向协同
-- **现象**: MMaDA Mixed Long-CoT SFT 阶段，文本推理、多模态理解、T2I 生成的所有指标同步提升（Figure 6），没有观察到显著 seesaw 效应。LaViDa-R1 的统一后训练在数学推理、grounding、image editing 上均取得提升。DiMOO Self-GRPO 联合优化 T2I+理解，验证「一个 loss 同时提升两种能力」
-- **支撑论文**: [[2025-MMaDA]]（Figure 6 跨模态协同效应）、[[2026-LaViDa-R1]]（统一 PG 框架多任务 RL 正向转移）、[[2025-Lumina-DiMOO]]（Self-GRPO 联合优化 T2I+理解）
-- **可能解释**: 统一 mask-predict 目标让文本/图像 token 共享同一语义恢复能力；CoT 格式的学习可迁移至图像生成的推理；多任务训练提供正则化防过拟合
-- **例外情况**: (1) 任务比例严重失衡时某任务可能欠训练；(2) RL 阶段的梯度冲突可能削弱协同效应；(3) 仅在 8-10B 验证，更大规模行为未知
-- **启示**: dLLM 统一训练是有基础的方向，不需要引入解耦来避免冲突，但需仔细设计任务采样比例和 reward scale
+### [P-Uni-01] 统一多模态模型中的跨模态训练产生正向协同
+- **现象**: MMaDA Mixed Long-CoT SFT 阶段，文本推理、多模态理解、T2I 生成的所有指标同步提升（Figure 6），没有观察到显著 seesaw 效应。LaViDa-R1 的统一后训练在数学推理、grounding、image editing 上均取得提升。DiMOO Self-GRPO 联合优化 T2I+理解，验证「一个 loss 同时提升两种能力」。Kimi K2.5 在 AR-based MoE 模型（1.04T, 32B 激活）上观察到视觉 RL 提升文本基准（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），将此 pattern 从 dLLM 特有推广为统一多模态模型的通用性质
+- **支撑论文**: [[2025-MMaDA]]（Figure 6 跨模态协同效应）、[[2026-LaViDa-R1]]（统一 PG 框架多任务 RL 正向转移）、[[2025-Lumina-DiMOO]]（Self-GRPO 联合优化 T2I+理解）、[[2025-KimiK2.5]]（AR MoE 模型上视觉 RL→文本基准正向迁移，首次在非 dLLM 架构上定量验证）
+- **可能解释**: 统一训练目标让文本/图像 token 共享底层抽象推理能力（逻辑链构建、证据整合、假设验证）；CoT 格式的学习可迁移至图像生成的推理；多任务训练提供正则化防过拟合；MoE 架构中跨模态知识在共享层（attention）传播而专用层（expert FFN）保持不干扰
+- **例外情况**: (1) 任务比例严重失衡时某任务可能欠训练；(2) RL 阶段的梯度冲突可能削弱协同效应；(3) K2.5 的 +1.7% 效应量较小，可能在噪声范围内（无标准差和多次重复实验），因果推断不充分——继续训练的一般性提升和训练数据知识重叠是混淆变量；(4) dLLM 中的协同（联合优化）vs AR 中的协同（顺序训练后的迁移）机制可能不同
+- **启示**: 跨模态正向协同不局限于 dLLM 统一模型，是统一多模态模型的通用性质。不需要引入解耦来避免冲突，但需仔细设计任务采样比例和 reward scale。开放问题：迁移的方向性（视觉→文本 vs 文本→视觉）是否对称？
 
 ---
 
@@ -34,11 +34,11 @@
 ---
 
 ### [P-Uni-03] MoE 架构可有效协调模态间容量需求不对称，缩小扩展律差距
-- **现象**: Beyond-LM 发现 MoE 架构（per-modality shared experts, G=16）将视觉-语言扩展律指数差距从 0.10（dense）缩小到 0.05，在相同激活参数下性能匹配或超过 dense 模型。MoE 自然涌现模态专家分化，无需显式监督。
-- **支撑论文**: [[2026-Beyond-LM]]（MoE 扩展律系统性研究）
-- **可能解释**: (1) Per-modality shared experts 为每个模态提供基础能力保障，routing experts 实现任务级专业化；(2) MoE 的稀疏激活允许更大的总参数量，为数据饥渴的视觉模态提供更多容量；(3) 自然涌现的专家分化减少了跨模态干扰
-- **例外情况**: (1) 仅在预训练阶段验证，后训练和 RL 阶段的 scaling law 未知；(2) 51:1 的视觉-语言数据不平衡可能导致 routing collapse；(3) 最优 granularity (G) 和 expert 数量尚无系统性指导
-- **启示**: MoE 是 LaViDa-O Elastic-MoT 任务级路由的自动化替代方案，可作为统一模型扩展的默认架构选择。需要进一步研究 MoE 配置空间（G/E/shared expert 设计）在不同训练阶段的最优值。
+- **现象**: Beyond-LM 发现 MoE 架构（per-modality shared experts, G=16）将视觉-语言扩展律指数差距从 0.10（dense）缩小到 0.05，在相同激活参数下性能匹配或超过 dense 模型。MoE 自然涌现模态专家分化，无需显式监督。Qwen3-VL 在 AR 侧进一步验证: 32B-MoE（64 experts, top-8 routing, entropy regularization）仅损失 1.2% 性能但降低 40% 推理延迟，提供了 AR 侧多模态 MoE 实用性的最完整数据。
+- **支撑论文**: [[2026-Beyond-LM]]（MoE 扩展律系统性研究，per-modality shared experts）、[[2025-Qwen3-VL]]（AR 侧 64e/top-8 MoE，40% latency ↓ / 1.2% quality ↓，entropy regularization 防 collapse）
+- **可能解释**: (1) Per-modality shared experts 为每个模态提供基础能力保障，routing experts 实现任务级专业化；(2) MoE 的稀疏激活允许更大的总参数量，为数据饥渴的视觉模态提供更多容量；(3) 自然涌现的专家分化减少了跨模态干扰；(4) Entropy regularization 确保所有 expert 被利用，防止少数 expert 垄断
+- **例外情况**: (1) 仅在预训练阶段验证，后训练和 RL 阶段的 scaling law 未知；(2) 51:1 的视觉-语言数据不平衡可能导致 routing collapse；(3) 最优 granularity (G) 和 expert 数量尚无系统性指导；(4) 长视频场景下大量同质视觉 token 趋向相同 expert，造成路由热点和推理延迟波动（Qwen3-VL AP-7）；(5) Entropy reg 强度需权衡——过高破坏合理的视觉/语言专家分化，过低无法防 collapse
+- **启示**: MoE 是 LaViDa-O Elastic-MoT 任务级路由的自动化替代方案，可作为统一模型扩展的默认架构选择。需要进一步研究 MoE 配置空间（G/E/shared expert 设计）在不同训练阶段的最优值。dLLM + MoE 的组合（并行生成 + 稀疏计算）是待验证的第八个推理加速维度。
 
 ---
 

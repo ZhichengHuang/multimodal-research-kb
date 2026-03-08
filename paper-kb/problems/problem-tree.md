@@ -24,15 +24,18 @@
   - 高分辨率需要大量 token → 计算成本
   - 压缩策略 (Perceiver, pooling) vs 保留细节
   - LaViDa 使用 2×2 average pooling（27²→14² per view, 共 980 token），但丢失 75% 空间分辨率导致 OCR/文档理解弱（TextVQA 56.3, DocVQA 59.0）。768² 高分辨率显著帮助 OCR 类任务（TextVQA +7.25, DocVQA +15.5），说明视觉 token 的空间细粒度对特定任务至关重要
+  - Qwen3-VL 提供 AR 侧的成熟方案: 动态分辨率（最高 1344×1344, 保持原始宽高比）+ 自适应 Token Merging（2.3× 效率提升同时保持性能），但 Token Merging 对 OCR/细粒度文档理解有损（均匀合并无重要性先验）
+  - dLLM 侧的 token 压缩策略（LaViDa 2×2 pooling、VidLaDA 帧级 pooling）均为粗暴全局压缩，Qwen3-VL 的内容感知自适应 merging 是否可迁移到 dLLM 尚未验证
   - 已有尝试:
-  - 相关论文: [[2025-LaViDa]]
+  - 相关论文: [[2025-LaViDa]], [[2025-Qwen3-VL]]
 - [PT-1c] 🟡 Connector 架构选择的本质区别是什么？
-  - MLP vs Q-Former vs Perceiver vs cross-attention
+  - MLP vs Q-Former vs Perceiver vs cross-attention vs 多层注入（DeepStack）
   - LLaDA-V 验证 dLLM 骨干 + 简单两层 MLP 连接器即可达 competitive 性能（MMMU 48.6）
   - LaViDa 使用更简单的单层线性投影即可在 LLaVa-1.6/Open-LLaVa-Next 上达 competitive，进一步验证 dLLM 不需要复杂连接器
   - Beyond-LM 验证 RAE + 简单连接器（类似 MLP）即可达 competitive 性能，进一步支持"dLLM 不需要复杂连接器"的结论
+  - Qwen3-VL DeepStack 在 AR VLM 中验证多层视觉注入（约第 10/20/30 层）贡献 +3.1% MMMU。但这是公认的性能提升手段（Flamingo cross-attention 的变体），而非方法论创新。对 dLLM 的启示: "dLLM 不需要复杂连接器"结论尚未覆盖"多层 cross-attention 注入"维度——dLLM 的 bidirectional attention 理论上在每层都能利用 visual cross-attention，效果可能与 AR 不同（需实验验证）
   - 已有尝试:
-  - 相关论文: [[2025-LLaDA-V]], [[2025-LaViDa]], [[2026-Beyond-LM]]
+  - 相关论文: [[2025-LLaDA-V]], [[2025-LaViDa]], [[2026-Beyond-LM]], [[2025-Qwen3-VL]]
 
 #### [PT-2] 🟡 多模态预训练数据如何配比？
 - [PT-2a] 🔴 图文对 vs interleaved 数据的最优比例
@@ -42,15 +45,18 @@
   - 保留语言能力 vs 冲淡视觉学习
   - 已有尝试:
   - 相关论文:
-- [PT-2c] 🔴 视频数据的引入时机和方式
-  - 已有尝试:
-  - 相关论文:
+- [PT-2c] 🟡 视频数据的引入时机和方式
+  - VidLaDA 提供 dLLM 视频训练的三阶段课程方案: (1) Short-clip temporal pre-training → (2) Temporal scaling warm-up → (3) Long-form video expansion（2-30 分钟）。配合时间分层采样 + LLM 指令合成 + text-bias 过滤 + MLLM 一致性投票的数据工程
+  - 已有尝试: VidLaDA 三阶段视频课程
+  - 相关论文: [[2025-VidLaDA]]
 - [PT-2d] 🟡 视觉 vs 语言数据的最优比例
   - Beyond-LM 首次为多模态数据配比提供大规模实证: 在万亿 token 规模下，视觉数据需求是语言的 51 倍（51:1）
   - 发现视觉比语言更"数据饥渴"，且差距随规模扩大而增加
+  - Kimi K2.5 提供另一数据点: 15T 规模 1.04T MoE 模型上恒定 10% 视觉 token 比例优于渐进提升策略，但消融不足（未扫描 5%-20% 范围），因果推断不成立
+  - 两者从不同维度切入（数据总需求量 vs 混合训练比例），方向一致: 视觉数据"够用但不主导"
   - 但仅一个数据点（万亿规模），小规模（百亿-千亿 token）下最优比例未知
   - 不同任务组合（纯理解 vs 统一模型）的最优比例可能不同
-  - 相关论文: [[2026-Beyond-LM]]
+  - 相关论文: [[2026-Beyond-LM]], [[2025-KimiK2.5]]
 
 #### [PT-3] 🟡 多模态 Scaling Law 是什么形态？
 - [PT-3a] 🔴 Vision encoder 和 LLM 的最优 size 比
@@ -58,18 +64,27 @@
   - LLaDA-V 提供 dLLM Scaling Law 的首个间接证据: MMMU-Pro 上 1M 数据 dLLM > 9M 数据 AR (LLaMA3-V)，暗示 dLLM 双向注意力在推理密集型任务上数据效率显著高于 AR
   - Beyond-LM 提供视觉-语言扩展律的首个系统性研究: Dense 模型中视觉和语言的参数扩展指数差距为 0.10；MoE 架构将差距缩小到 0.05，有效协调了模态间容量需求
   - Beyond-LM 发现 MoE (per-modality shared experts, G=16) 在相同激活参数下性能匹配或超过 dense 模型
+  - Qwen3-VL 提供 AR 侧最完整的 scaling curve: 2B→4B→8B→32B dense + 32B-MoE（64 experts, top-8 routing），32B-MoE 仅损失 1.2% 性能但降低 40% 推理延迟，验证了多模态 MoE 的实用性。但所有变体共享相同 Vision Encoder，仅 LLM backbone 不同——Vision encoder scaling 仍是空白
+  - dLLM 侧的 scaling law 研究仍缺（LLaDA-V 8B 是唯一数据点），与 AR 侧 Qwen3-VL 的完整 scaling curve 形成鲜明对比
   - 但仅在预训练阶段验证，后训练和 RL 阶段的 scaling law 未知
-  - 相关论文: [[2025-LLaDA-V]], [[2026-Beyond-LM]]
+  - 相关论文: [[2025-LLaDA-V]], [[2026-Beyond-LM]], [[2025-Qwen3-VL]]
 
 #### [PT-4] 🔴 dLLM 骨干的任务偏好分布
 - LLaDA-V 首次揭示 dLLM 理解的 fine-grained 优劣势: 知识/数学推理 (MMMU +3.2, MMMU-Pro +6.9) 系统性优于 AR；图表/文档理解 (AI2D -3.3, DocVQA -2.3) 系统性弱于 AR
+- VidLaDA 新增视频维度数据点: 长视频全局推理 dLLM 优（LongVideoBench +3.2, MLVU +3.0），短视频时序定位 dLLM 弱（MVBench -10.2，差距远超图像域 -2 至 -3）
 - 核心问题: 哪些理解子任务天然适合 dLLM、哪些不适合？18 个基准远不足以绘制完整"dLLM 能力地图"
 - 与 MMaDA GenEval Position 0.20 的空间推理弱点可能属同一根源——dLLM 缺乏序列/结构推理归纳偏置
 - 潜在思路: 更系统的 benchmark 分类分析；probing study 对比 dLLM vs AR 不同层表征质量
-- 相关论文: [[2025-LLaDA-V]], [[2025-MMaDA]]
+- 相关论文: [[2025-LLaDA-V]], [[2025-MMaDA]], [[2025-VidLaDA]]
 
-#### [PT-5] 🔴 dLLM 多模态理解的数据效率机制
-- LLaDA-V 发现 MMMU-Pro 上 1M 数据 dLLM > 9M 数据 AR——双向注意力为何在少数据条件下更高效？
+- [PT-4a] 🔴 dLLM 骨干在短视频/细粒度时序任务上的结构性弱势
+  - VidLaDA MVBench 59.4 vs Qwen2.5-VL 69.6（-10.2）——差距远超图像域（-2 至 -3），说明视频时序因果推理是 dLLM 更严重的结构性弱点
+  - 根因: MVBench 包含动作顺序、因果关系、状态变化等天然顺序依赖任务。dLLM bidirectional attention 无法区分"A→B"和"B→A"序列（需依赖 position embedding 区分因果方向），AR 的 causal mask 强制编码顺序偏好
+  - Qwen3-VL 的 Interleaved-MRoPE 消融显示 temporal 轴位置编码是最关键组件（+4.2% MMMU），从位置编码层面解决时序感知。但 MRoPE 为 AR causal attention 设计，**dLLM 中完全未尝试空间-时序位置编码**——这是 KB 中新暴露的 gap。MRoPE 与完全双向注意力理论上兼容（位置编码与 attention mask 正交），但与 dLLM 的部分因果优化（Prefix-DLM）冲突
+  - 潜在思路: 时序感知 masking schedule（时间早的帧先去噪）；Temporal Block Diffusion（按时间块顺序去噪 + 块内并行）；混合 attention（理解全双向 + 解码时序因果）；**MRoPE-dLLM（将三轴位置编码引入 dLLM，仅改位置编码不触及 attention mask，详见 [[qwen3vl-crossover-to-dllm#方向A]]）**
+  - 相关论文: [[2025-VidLaDA]], [[2025-Qwen3-VL]]
+- [PT-4b] 🔴 dLLM 多模态理解的数据效率机制
+  - LLaDA-V 发现 MMMU-Pro 上 1M 数据 dLLM > 9M 数据 AR——双向注意力为何在少数据条件下更高效？
 - 可能解释: (1) bidirectional attention 每个 token 利用完整上下文，有效信息流量更大; (2) mask-predict 目标的数据增强效应（不同 mask pattern = 不同训练 instance）; (3) 推理任务的全局依赖性与双向 attention 的天然匹配
 - 需要多任务多规模的系统 Scaling Study 验证
 - 相关论文: [[2025-LLaDA-V]]
@@ -126,9 +141,10 @@
 ### [RL] RL 阶段
 
 #### [RL-1] 🔴 多模态 Reward Signal 如何设计？
-- [RL-1a] 🔴 图文场景的 reward model 该怎么训？
-  - 已有尝试:
-  - 相关论文:
+- [RL-1a] 🟡 图文场景的 reward model 该怎么训？
+  - 已有尝试: Kimi K2.5 GRM (Generative Reward Model) 是 KB 中首个细粒度多维 reward model——用生成式模型输出 helpfulness/relevance/aesthetic quality 等多维度评估，超越 CLIP+ImageReward 的二元判断
+  - 但 GRM 的架构细节、训练数据、评估准确率均未公开，可复制性存疑
+  - 相关论文: [[2025-KimiK2.5]]
 - [RL-1b] 🔴 VLM-as-judge 的可靠性如何？
   - 已有尝试: LaViDa-R1 报告 UnifiedReward-Qwen-7B 会幻觉出错误评判标准
   - 相关论文: [[2026-LaViDa-R1]]
@@ -144,8 +160,8 @@
 
 #### [RL-2] 🔴 GRPO/PPO 如何适配多模态？
 - [RL-2a] 🟡 多模态采样的成本远高于纯文本，如何降低？
-  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]]
+  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator; Kimi K2.5 Toggle RL 从输出长度维度优化——交替预算约束/全长生成，输出 token 减少 25-30%（与 dLLM 特有技术正交的通用方案）; LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算（无似然度方案），同时 flow matching 轨迹拉直效应减少推理步数（代码 -41.8 步，推理 -159 步），进一步降低采样成本
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-KimiK2.5]], [[2026-LFPO]]
 - [RL-2b] 🔴 Group 构造: 同一图不同回答 vs 不同图？
 - [RL-2c] 🔴 高熵 token 分布下的 RL 正则化
   - MMaDA 保留 KL penalty, LaViDa-R1 发现 image token NLL>6 导致 KL estimator 方差极大、训练发散
@@ -173,6 +189,20 @@
   - 训练早期策略快速提升时，mu_glob 偏低导致 saturated failure 的惩罚信号 (-S_q × mu_glob) 偏弱
   - 潜在思路: EWMA 替代全历史 Welford（窗口大小与 KL divergence 联动）；分阶段重置先验；在线学习 shrinkage 权重
   - 相关论文: [[2026-EBPO]]
+- [RL-2g] 🔴 Velocity-based vs Likelihood-based dLLM RL 的系统对比
+  - LFPO 的速度场修正（无似然度，精确梯度）和 UniGRPO/complementary masking 的似然度估计（近似，有方差）代表两条根本不同的优化路径
+  - 理论上 LFPO 消除了似然度估计方差，但 Theorem 3.1 依赖连续时间极限假设，少步推理（8-32 步）场景下离散化误差可能系统性偏大
+  - Token 级 credit assignment 被牺牲——LFPO 在时间步级别操作速度残差，关键推理步骤仅涉及 2-3 个 token 时信号被平均化；likelihood-based 方法可通过 token 级 log prob 做细粒度归因
+  - 需要在相同基座（LLaDA 8B / DiffuCoder）、相同任务、相同 reward 下做严格对比——精度 vs 方差 vs 计算成本 vs 推理步数的全面 Pareto 分析
+  - 潜在思路: 混合方案——LFPO 粗粒度方向 + complementary masking 细粒度 token 级修正；自适应切换（训练早期用 LFPO 快速对齐，后期切换至 likelihood-based 精调）
+  - 相关论文: [[2026-LFPO]], [[2025-MMaDA]], [[2026-LaViDa-R1]]
+- [RL-2h] 🔴 RL 后训练的轨迹拉直机制
+  - LFPO 观察到 RL 训练后推理步数显著减少（代码 -41.8 步，推理 -159.0 步），论文归因于 flow matching 的轨迹拉直效应，但缺乏严格理论分析
+  - 对比: AGRPO 在 MATH 上反而增加 +73.6 步——不同 RL 方法对推理步数的影响方向相反
+  - 核心问题: 为什么对比式速度修正会导致更直的去噪路径？这是 flow matching 的固有性质还是对比式优化的特异效果？
+  - 与 XDLM 预训练减步（混合噪声核）和 DiMOO ML-Cache 推理减步形成三层加速体系——预训练 / 后训练 / 推理各一层
+  - 潜在思路: 分析对比式优化目标的隐式正则化效应；设计专门利用轨迹拉直效应的训练目标进一步放大减步效果；验证 LFPO + XDLM 双层减步的叠加效果
+  - 相关论文: [[2026-LFPO]], [[2025-XDLM]], [[2025-Lumina-DiMOO]]
 
 #### [RL-4] 🔴 轨迹级 RL vs Token 级 RL 的 Tradeoff
 - MMaDA-Parallel ParaRL 采用轨迹级优化（沿整个去噪轨迹应用 CLIP-based alignment reward）
@@ -196,20 +226,22 @@
 
 #### [RL-3] 🟡 RL 能提升多模态推理能力吗？
 - [RL-3a] 🟡 视觉推理 (图表/几何) 的 verifiable reward
-  - 已有尝试: MMaDA 对 GeoQA/CLEVR 用 correctness+CLIP reward, UniGRPO 提升 GSM8K +8.2; LaViDa-R1 在 MathVista +2.4; OpenMMReasoner GSPO 在 9 个 benchmark 平均 +11.6%; EBPO 在数学推理上 G=8 时 +11.28%（验证改进 advantage 估计对困难推理任务的显著效果，机制可迁移到多模态）
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-OpenMMReasoner]], [[2026-EBPO]]
+  - 已有尝试: MMaDA 对 GeoQA/CLEVR 用 correctness+CLIP reward, UniGRPO 提升 GSM8K +8.2; LaViDa-R1 在 MathVista +2.4; OpenMMReasoner GSPO 在 9 个 benchmark 平均 +11.6%; EBPO 在数学推理上 G=8 时 +11.28%（验证改进 advantage 估计对困难推理任务的显著效果，机制可迁移到多模态）; Kimi K2.5 视觉 RL 后文本基准微弱提升（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），方向性证据但效应量可能在噪声范围内; LFPO 在 LLaDA 8B 上 GSM8K +9.9%、MATH +7.0%，同时推理步数显著减少（-159 步），验证无似然度范式在推理任务上的有效性
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-OpenMMReasoner]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]]
 - [RL-3b] 🔴 RL 对 grounding 能力的影响
   - 相关论文: [[2026-LaViDa-R1]]
 - [RL-3c] 🔴 传统 VLM RL vs dLLM RL 的方法论差异
   - OpenMMReasoner 在传统 VLM（Qwen2.5-VL-7B，AR 生成）上验证 RL（GSPO）有效性，与 dLLM RL 工作（MMaDA/LaViDa-R1）形成架构分野
+  - Kimi K2.5 作为 1.04T AR-based MoE VLM，为 dLLM RL 提供性能天花板参考；GRM/Toggle RL/Cross-Modal RL 三个方法论组件可迁移到 dLLM
+  - Qwen3-VL 成为 KB 中最强 AR baseline（MMMU 72.3% 32B, 68.9% 8B, beats GPT-4o），使 AR/dLLM RL 方法论对比研究更有参考价值。其 RLHF（200K 偏好对, PPO with KL penalty）是标准 AR RL 管线
   - 核心差异:
     - **Likelihood 估计**: 传统 VLM 直接用 AR 解码的 log p(y|x)；dLLM 需要特殊估计（complementary masking/随机 mask ratio）覆盖完整去噪时间步
     - **KL 正则化**: 传统 VLM 的 token 分布熵较低，KL estimator 方差小；dLLM 高熵分布下 KL 存在争议（LaViDa-R1 移除 KL，MMaDA/DiMOO 保留 KL）
     - **Rollout 策略**: 传统 VLM 直接 ×16 采样；dLLM 需要覆盖去噪时间步（complementary masking 或随机 mask ratio）
   - 开放问题: 两者的 RL 方法能否互相借鉴？GSPO 的稳定性优势能否迁移到 dLLM？GSPO 能否适配 masked diffusion？
   - 潜在思路: 抽象出与架构无关的 PG 组件（advantage 估计、reward shaping、正则化）；GSPO-MDM（将 GSPO 的 group-based advantage 适配到 masked diffusion）；统一 Policy Gradient 框架
-  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO
-  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]]
+  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO。LFPO 是第二个仅适用于 dLLM 的 RL 组件（继 answer-forcing 后）——Theorem 3.1 依赖离散 token 空间 + cross-entropy loss 特性，无法直接迁移到 AR 模型，进一步证实 dLLM RL 正在发展出独立于 AR RL 的方法论体系
+  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-Qwen3-VL]]
 
 ---
 
@@ -234,7 +266,15 @@
   - 连续扩散在统一场景中尚无可比工作
   - Beyond-LM 的 Hybrid Attention Masking（帧内双向 + 跨序列因果）试图兼顾 AR 和 Diffusion 在注意力模式上的优势，是连续扩散方向的新数据点
   - SDAR-VL 在 21 个基准上达到与 AR 基线相当的性能，并通过 ABNS/EMRS/PBNC 解决块状离散扩散的训练稳定性问题
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-LLaDA-V]], [[2025-ReDiff]], [[2026-Beyond-LM]], [[2025-SDAR-VL]]
+  - VidLaDA 首次将 dLLM 扩展到视频理解: 长视频上 dLLM 优于 AR（LongVideoBench +3.2, MLVU +3.0），短视频时序任务 dLLM 弱于 AR（MVBench -10.2）。三重鲁棒性证据: 位置 variance <2% vs AR >10%，时间位置平稳 vs U 型，帧稀疏无损 vs 急剧下降。MARS-Cache 实现 12.5× 推理加速
+  - XDLM 通过 stationary noise kernel 统一 MDLM (k=0) 和 UDLM (k=1)，证明纯 mask 噪声 (k=0) 不是离散扩散的最优选择——k=0.1 混合噪声在几乎不损失理解（54.110 vs MDLM 53.650）的前提下大幅提升少步生成质量（FID 54.1 vs MDLM 80.8）。在 LLaDA-8B 上 continual pretraining 验证（MBPP 32 步 15.0 vs 基线 6.8）。对 KB 中所有基于 MDLM 的工作有直接影响——k=0.1 kernel 可作为 drop-in 训练目标替换
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-LLaDA-V]], [[2025-ReDiff]], [[2026-Beyond-LM]], [[2025-SDAR-VL]], [[2025-VidLaDA]], [[2025-XDLM]]
+- [Diff-1b-1] 🔴 dLLM 信息容量上界悖论——理论与实验不一致
+  - VidLaDA Proposition 3.2 证明 bidirectional decoding 信息容量上界**更低**（通过 Markov chain decomposition + Data Processing Inequality），但实验中 dLLM 性能更好
+  - 悖论: 更低的信息容量上界意味着更少信息可用，逻辑上应是劣势而非优势。论文将其作为 dLLM 优势的理论依据存在逻辑断层
+  - 正确解释可能是: dLLM 的优势来自"更均匀的信息分配"（每个 token 对等参与表征构建），而非"更高信息容量"
+  - 核心需求: 建立区分"representation capacity"和"generation capacity"的理论框架——理解任务的性能取决于表征质量而非生成容量
+  - 相关论文: [[2025-VidLaDA]]
 - [Diff-1c] 🟡 采样效率: 如何在统一模型中减少 diffusion 步数
   - Consistency model / distillation 是否适用
   - Few-step generation 对理解能力的影响
@@ -248,7 +288,10 @@
   - Sparse-LaViDa: 首个同时支持 KV 缓存和 token 截断且不牺牲双向上下文的 MDM 加速方案。通过稀疏参数化（动态截断 mask token）+ register tokens（容量补偿）+ step-causal attention mask（KV 缓存支持）实现 1.95-2.83× 加速，质量几乎无损（GenEval 0.78 vs 0.77）。与 Prefix-DLM 和 ML-Cache 正交可叠加，理论上可达 10-15× 总加速
   - SDAR-VL 的块状扩散策略（ABNS 异步噪声 + EMRS 掩码比例缩放 + PBNC 渐进课程）提供训练稳定性优化，与上述推理加速技术正交互补
   - DiffusionVL Block Diffusion: 块间 KV 缓存 + 块内并行去噪，2× 加速。块内双向 + 块间因果的混合注意力实现了 AR-Diffusion 融合
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-ReDiff]], [[2025-Sparse-LaViDa]], [[2025-DiffusionVL]], [[2025-SDAR-VL]]
+  - VidLaDA MARS-Cache: 帧级 chunk attention（±1 帧局部 O(n·k) vs 全局 O(n²)）+ adaptive anchor token 搜索 + 模态异步刷新（视觉慢/文本快，深层快/浅层慢），12.5× 加速，KB 中最高的单一加速方案。与 Prefix-DLM、ML-Cache 正交可叠加（理论 15-20×）
+  - XDLM 少步高质量生成: 通过 k=0.1 混合噪声核训练，8-32 步即可获得高质量结果（ImageNet-1K 16 步 FID 25.77 vs MDLM 80.8），是推理加速的第六个正交维度——减少步数 2-4× 与上述每步加速技术正交叠加，理论总加速 30-100×
+  - LFPO RL 轨迹拉直: 对比式速度修正使去噪路径更直，代码平均减少 41.8 步、推理减少 159 步（对比 AGRPO 在 MATH 上增加 +73.6 步），是第七个正交维度——后训练层面减步，与 XDLM 的预训练层面减步机制不同，两者可叠加
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-ReDiff]], [[2025-Sparse-LaViDa]], [[2025-DiffusionVL]], [[2025-SDAR-VL]], [[2025-VidLaDA]], [[2025-XDLM]], [[2026-LFPO]]
 - [Diff-1c-1] 🔴 Register tokens 的最优数量和设计原则
   - Sparse-LaViDa 使用固定 64 个 register 作为被截断 mask token 的全局摘要，但这是经验选择（0→64 时 GenEval 0.76→0.78，FID 9.32→7.63）
   - 核心问题: 最优数量是否与截断比例、序列长度、模型容量相关？如何理论推导最优值？
@@ -271,7 +314,8 @@
   - DiffusionVL 需要"高质量预训练 AR 模型"但未量化阈值
   - AR 模型质量是多维的(困惑度、下游任务、推理能力)，哪些维度对扩散迁移最关键?
   - 需要系统性消融: 3B/7B/13B 不同质量 AR 模型的扩散微调效果
-  - 相关论文: [[2025-DiffusionVL]]
+  - Qwen3-VL-8B 作为同规模但更强的 AR 基座（MMMU 68.9% vs Qwen2.5-VL 更低），提供了检验"stronger AR base → better diffusion finetuning"的直接对比机会。用 Qwen3-VL-8B 重复 DiffusionVL 实验可验证 "5% 数据达 95% AR 性能" 的关系是否是常数
+  - 相关论文: [[2025-DiffusionVL]], [[2025-Qwen3-VL]]
 - [Diff-1f] 🔴 块大小的自适应选择理论
   - DiffusionVL Block Diffusion 块大小 1-16 性能差异 <1.1 分，但最优选择是任务相关的
   - 短回复适合小块(高精度)，长文档适合大块(高并行度)
@@ -295,6 +339,18 @@
   - 开放问题: Interleaving 策略如何系统化设计？如何量化错误传播的严重程度？
   - 潜在思路: 结构化错误注入训练（基于注意力的级联错误模拟）；并行生成 + 主动精炼组合；理论分析错误传播的图结构
   - 相关论文: [[2025-MMaDA-Parallel]], [[2025-ReDiff]]
+- [Diff-1j] 🔴 离散扩散噪声核的最优设计空间
+  - XDLM 证明 k=0.1（10% uniform + 90% mask）打破 MDLM-UDLM Pareto 前沿，但 k=0.1 是纯经验值无理论推导
+  - 核心问题: (1) k 的最优值是否跨任务/跨规模/跨词表稳定？(2) 是否需要 time-varying k（训练早期 k=0 快速收敛，后期 k→0.1 延续学习）？(3) 多模态场景下是否需要 modality-aware k（文本 k_text vs 图像 k_image）？
+  - XDLM 的 performance crossover 发现（MDLM 早期强但饱和 vs XDLM/UDLM 后期持续提升）暗示 time-varying k 可能严格更优
+  - 潜在思路: 系统性消融（task × scale × vocab × k grid search）；理论推导 k 与任务信息论特性的关系；自适应 k schedule 结合 SDAR-VL 的 PBNC 思想
+  - 相关论文: [[2025-XDLM]], [[2025-SDAR-VL]]
+- [Diff-1k] 🔴 MDLM 训练饱和的根因——训练目标 vs 训练-推理分布不匹配
+  - XDLM 的 performance crossover 发现 MDLM 在 >200K 步后快速饱和，论文归因于"训练目标过简单"（mask-only 二分类）
+  - 替代解释: 训练-推理分布不匹配在长训练后累积——模型过度拟合"干净 context + [MASK]"条件分布，推理时的"部分正确 context + [MASK]"越来越偏离训练分布。与 P-Diff-04 从不同角度描述同一现象
+  - 区分两种归因很重要: 若是目标过简单 → XDLM 混合噪声是正确方案；若是分布不匹配 → ReDiff 精炼训练可能更直接
+  - 潜在思路: 设计对照实验——(1) MDLM + ReDiff 精炼（仅解决分布不匹配）vs (2) XDLM k=0.1（同时改变目标和分布）vs (3) XDLM + ReDiff（双层方案）。若 (1) 也消除饱和，说明分布不匹配是主因
+  - 相关论文: [[2025-XDLM]], [[2025-ReDiff]]
 
 #### [Diff-2] 🔴 Diffusion 骨干架构演进
 - [Diff-2a] 🔴 DiT 成功的本质原因？Transformer 替代 UNet 的关键
@@ -430,7 +486,10 @@
   - 相关论文: [[2025-LaViDa-O]], [[2025-Lumina-DiMOO]]
 
 #### [Uni-4] 🔴 扩展到视频
-- [Uni-4a] 🔴 计算瓶颈: 视频 token 数爆炸
+- [Uni-4a] 🟡 计算瓶颈: 视频 token 数爆炸
+  - VidLaDA MARS-Cache 提供推理层面的部分解决: 帧级 chunk attention + anchor 复用 + 模态异步刷新实现 12.5× 加速，将视频推理从不可用（3.3 TPS）提升至可用（33.6 TPS），精度几乎无损（MLVU 50.7% vs 50.2%）
+  - 但训练层面的 token 爆炸问题仍未解决（VidLaDA 使用 SigLIP2 + 2×2 spatial pooling 做 4× token 压缩，仍受限于帧数）
+  - 相关论文: [[2025-VidLaDA]]
 - [Uni-4b] 🔴 时序建模: AR 时序 + Diffusion 空间的混合
 - [Uni-4c] 🔴 视频理解和生成的统一是否比图像更难？
 - [Uni-4d] 🔴 世界模型视角: 视频生成 = 物理规律学习？
@@ -438,8 +497,9 @@
 #### [Uni-5] 🟡 统一模型的 Post-training 和 RL
 - [Uni-5a] 🟡 统一模型如何做 alignment？
   - 理解和生成分别对齐 vs 联合对齐
-  - 已有方案: MMaDA 提供首个 diffusion-native 全链路（预训练→Mixed CoT SFT→UniGRPO RL）; LaViDa-R1 提供统一 PG 框架（SFT+GRPO+self-distillation）; DiMOO 提供四阶段管线 + Self-GRPO 联合 RL; EBPO 的 shrinkage baseline 可作为架构无关的 advantage 估计改进，直接嵌入任何 GRPO 变体
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]]
+  - 已有方案: MMaDA 提供首个 diffusion-native 全链路（预训练→Mixed CoT SFT→UniGRPO RL）; LaViDa-R1 提供统一 PG 框架（SFT+GRPO+self-distillation）; DiMOO 提供四阶段管线 + Self-GRPO 联合 RL; EBPO 的 shrinkage baseline 可作为架构无关的 advantage 估计改进，直接嵌入任何 GRPO 变体; LFPO 提供无似然度的速度场修正范式，天然规避 KL 在高熵 image token 下的方差问题
+  - dLLM RL 已形成四种范式: 似然度近似(UniGRPO) / 似然度降方差(complementary masking) / advantage 降方差(EBPO) / 无似然度(LFPO)
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2026-LFPO]]
 - [Uni-5b] 🟡 统一模型的 reward 如何设计？→ 连接到 [RL-1c]
   - 理解正确性 + 生成质量 + 一致性 的多目标 reward
   - 已有方案: MMaDA Diversified Reward (correctness/format/CLIP/ImageReward), LaViDa-R1 Multi-Reward (correctness/IoU/EditScore), DiMOO Self-GRPO (模型自身理解能力作为隐式 reward)
@@ -449,10 +509,10 @@
   - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]]
 - [Uni-5c] 🟡 RL 是否能促进理解-生成的协同？
   - 假设: RL 优化"看图生图"任务可能同时提升两种能力
-  - 已有证据: MMaDA UniGRPO 同时提升 GSM8K (推理) 和 ImageReward (生成); LaViDa-R1 多任务 RL 各任务均有提升; DiMOO Self-GRPO 验证「一个 loss 同时提升 T2I 和理解」
+  - 已有证据: MMaDA UniGRPO 同时提升 GSM8K (推理) 和 ImageReward (生成); LaViDa-R1 多任务 RL 各任务均有提升; DiMOO Self-GRPO 验证「一个 loss 同时提升 T2I 和理解」; Kimi K2.5 在 AR MoE (1.04T) 上观察到视觉 RL 后文本基准提升 (MMLU-Pro +1.7%, GPQA-Diamond +2.1%)，首次在非 dLLM 架构上定量观察跨模态协同，但效应量小且缺乏统计检验
   - DiMOO 的联合目标 L(θ) = -∑w(g)(ℓ_T2I + ℓ_MMU) + β·KL，明确将 T2I 和理解 loss 绑定在同一优化中
-  - 但机制不清晰: 是共享表示的迁移还是任务间正则化？
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]]
+  - 但机制不清晰: 是共享表示的迁移还是任务间正则化？dLLM 中的联合优化 vs AR 中的顺序训练后迁移，机制可能不同
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-KimiK2.5]]
 
 #### [Uni-6] 🔴 Thinking-Aware Image Synthesis 的评估标准
 - MMaDA-Parallel 提出 ParaBench（300 challenging prompts，6 维度评估：text quality, text alignment, image quality, image alignment, image consistency, cross-modal output alignment）

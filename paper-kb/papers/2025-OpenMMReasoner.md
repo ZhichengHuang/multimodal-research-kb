@@ -141,6 +141,7 @@ aliases: [OpenMMReasoner]
 
 `combines_with` → [[2025-dMLLM-TTS]]: 训练时 RL 优化（OpenMMReasoner）+ 推理时 test-time scaling（dMLLM-TTS）可组合——先用 RL 提升基座推理能力，再用 HTS 搜索最优输出
 - `alternative_to` → [[2026-EBPO]]: 同为改进 GRPO 的工作——GSPO 改进 group 构造，EBPO 改进 baseline 估计；两者正交可叠加
+- `combines_with` → [[2025-KimiK2.5]]: 跨模态 RL 正迁移的互相验证——OpenMMReasoner 在传统 VLM 上，K2.5 在 AR MoE 上；但两者证据强度均不足以建立因果
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

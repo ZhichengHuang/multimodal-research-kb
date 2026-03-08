@@ -128,6 +128,7 @@ dLLM 统一模型的性能瓶颈不在架构（模态无关共享即可），而
 - `combines_with` → [[2026-EBPO]]: EBPO 可替换 Self-GRPO 的 baseline 估计；Self-GRPO 自评估 reward 噪声较高，EBPO 方差降低价值更大
 - `alternative_to` → [[2026-Beyond-LM]]: 同为大规模统一模型——DiMOO 从 LLaDA 初始化+离散扩散+~110M 数据 vs Beyond-LM 从零训练+连续扩散+MoE；"视觉数据饥渴"发现互相呼应
 - `combines_with` → [[2025-SDAR-VL]]: DiMOO 的 ML-Cache（推理加速）与 SDAR-VL 的块状处理（训练稳定性）正交互补
+- `alternative_to` → [[2025-KimiK2.5]]: 统一模型路线分歧——DiMOO 离散扩散统一架构 vs K2.5 纯 AR MoE 多模态 + agentic；GRM（外部评估器）vs Self-GRPO（自评估）reward 策略对比
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

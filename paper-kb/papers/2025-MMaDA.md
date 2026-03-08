@@ -124,6 +124,7 @@ aliases: [MMaDA, UniGRPO]
 - `alternative_to` → [[2025-SDAR-VL]]: 同为 dLLM 多模态模型——标准 masked diffusion+UniGRPO RL vs 块状扩散+ABNS/EMRS/PBNC 训练稳定性优化
 - `combines_with` → [[2026-EBPO]]: EBPO 的 shrinkage baseline 可直接替换 UniGRPO 中的 GRPO baseline 估计，解决"训练信号消失问题未解决"
 - `alternative_to` → [[2026-Beyond-LM]]: 统一模型路线之争——LLaDA 初始化纯离散扩散 + 模态无关全共享 vs 从零训练 AR+连续扩散混合 + modality-specific FFN + MoE
+- `alternative_to` → [[2025-KimiK2.5]]: 架构路线对立——dLLM (masked diffusion) vs AR-based MoE (1.04T, 自回归)；同样做跨模态 RL 但实现不同（UniGRPO vs GRM+Toggle RL）；K2.5 在 AR 上独立验证跨模态协同 (P-Uni-01)
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

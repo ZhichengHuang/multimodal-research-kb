@@ -112,6 +112,7 @@ dLLM 的双向生成能力（bidirectional inpainting）不仅是推理时的优
 - `alternative_to` → [[2026-EBPO]]: 两者解决训练信号消失的方式正交——LaViDa-R1 用 answer-forcing 生成正向样本（dLLM inpainting），EBPO 用 shrinkage baseline 从全失败 group 提取负向梯度（统计方法）；可叠加使用
 - `combines_with` → [[2025-dMLLM-TTS]]: dMLLM-TTS 的 test-time scaling（HTS 搜索）可在 LaViDa-R1 训练后进一步提升推理质量；LaViDa-R1 的 tree search 是训练时探索，dMLLM-TTS 是推理时搜索
 - `combines_with` → [[2025-SDAR-VL]]: SDAR-VL 的块状扩散训练稳定性优化（ABNS/EMRS/PBNC）可迁移到 LaViDa-R1 骨干的预训练阶段
+- `alternative_to` → [[2025-KimiK2.5]]: 多模态 RL 方案对比——dLLM RL (answer-forcing + complementary masking) vs AR RL (GRM + Toggle RL)；K2.5 在 AR MoE 上独立验证跨模态正迁移
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 
