@@ -95,6 +95,12 @@
 - **需要验证**: (1) 在同等训练数据、同等计算资源下对比从零训练的AR vs Diffusion; (2) 测试"弱AR���型 + 扩散微调"的下界，判断性能主要来自AR基础还是扩散训练增益; (3) 大规模扩散训练(50M-100M样本)是否能超越AR
 - **相关论文**: [[2025-DiffusionVL]] (AR初始化5%数据), [[2025-LLaDA-V]] (从零训练15M数据)
 
+#### [PT-8] 🔴 稀疏 MoE 训练稳定性诊断向多模态推广
+- **问题**: Step 3.5 Flash + GLM-5 独立验证了 "Expert Collapse ≠ Routing Collapse"——routing 统计（gate probability, dispatch counts）正常但专家 activation norm 归零。诊断框架包含三层: (1) per-expert activation norm 监控（max-to-median ratio 是最可靠 early indicator）; (2) Muon Polar Express float16 数值修复; (3) FFN intermediate activation clipping（优于 weight clipping）
+- **多模态 gap**: Beyond-LM 使用 per-modality shared experts + routing experts，51:1 视觉:语言数据不平衡下 expert collapse 是否呈现新模式？视觉专家是否可能因 routing 偏好而 "饿死"？
+- **需要验证**: (1) 将 per-expert activation norm 监控扩展为 per-modality 分析; (2) 测试 activation clipping 是否需要 per-modality 阈值（视觉 vs 语言 FFN 激活分布不同）; (3) EP-level load balancing 在模态路由偏好下是否需要 per-modality ℒ_EP
+- **相关论文**: [[2026-Step35Flash]], [[2026-GLM-5]], [[2026-Beyond-LM]]
+
 ---
 
 ### [Post] 后训练阶段
@@ -123,6 +129,12 @@
   - "合理多样性"的边界在哪？过度多样性何时会损害性能？
   - 潜在思路: 信息论视角建模多样性收益（最大化 I(路径集合; 任务分布)）；主动学习选择高不确定性样本；课程学习先简单后多样
   - 相关论文: [[2025-OpenMMReasoner]]
+- [Post-2c-1] 🔴 质量-多样性 Pareto 前沿
+  - OpenMMReasoner 的 no-filtering 策略与常见的 aggressive curation 矛盾——何时过滤有益 vs 何时过滤有害？
+  - 三种互补解释: (1) 噪声正则化——"非最优"推理路径提供 reasoning-level label smoothing; (2) 覆盖保留——过滤创建分布 gap（删除含 backtracking 的链导致不会自我纠错）; (3) 探索预调——messy 推理链降低 RL 策略自信度，促进探索
+  - 需要形式化建模: 在什么数据质量阈值下，过滤开始损害多样性多于帮助质量？
+  - 潜在思路: 信息论建模 H(Path_set) vs 质量分的 Pareto 曲线；A/B test 不同过滤阈值的下游 RL 效果
+  - 相关论文: [[2025-OpenMMReasoner]]
 - [Post-2d] 🔴 跨域迁移的泛化性边界
   - OpenMMReasoner 验证数学推理 → 多模态推理的正迁移（"textual reasoning transfers alongside strengthened multimodal reasoning"）
   - 边界未明: 需要共享推理模式（如分步求解、逻辑链构建）
@@ -130,6 +142,11 @@
   - 哪些领域组合存在负迁移？如何量化领域间的"推理模式相似度"？
   - 混合比例的最优值未知（OpenMMReasoner 未明说 We-Math2.0 占比）
   - 潜在思路: 构建多领域迁移矩阵（N×N）；基于任务表征的相似度度量；元学习框架自动发现可迁移模式；动态混合策略（训练中根据验证集调整领域权重）
+  - 相关论文: [[2025-OpenMMReasoner]]
+- [Post-2e] 🔴 教师-学生最优规模比与蒸馏效率
+  - OpenMMReasoner 使用 235B→7B (~33×) 教师-学生规模比，教师比 baseline 在所有 benchmark 上平均提升 ≥4.5 分
+  - 核心问题: (1) 是否存在最小有效比例（32B→7B 约 4.6× 是否足够）？(2) 规模比与 ×k 采样的交互——更大教师是否让更少采样即可达到相同多样性？(3) 不同领域对教师质量的敏感度不同
+  - 潜在思路: 系统消融不同规模教师的蒸馏效果；信息论分析蒸馏效率与规模比的关系；per-domain 教师质量评估决定是否需要领域特化教师
   - 相关论文: [[2025-OpenMMReasoner]]
 
 #### [Post-3] 🔴 DPO 类方法在多模态场景有效吗？
@@ -160,8 +177,8 @@
 
 #### [RL-2] 🔴 GRPO/PPO 如何适配多模态？
 - [RL-2a] 🟡 多模态采样的成本远高于纯文本，如何降低？
-  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator; Kimi K2.5 Toggle RL 从输出长度维度优化——交替预算约束/全长生成，输出 token 减少 25-30%（与 dLLM 特有技术正交的通用方案）; LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算（无似然度方案），同时 flow matching 轨迹拉直效应减少推理步数（代码 -41.8 步，推理 -159 步），进一步降低采样成本
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-KimiK2.5]], [[2026-LFPO]]
+  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator; Kimi K2.5 Toggle RL 从输出长度维度优化——交替预算约束/全长生成，输出 token 减少 25-30%（与 dLLM 特有技术正交的通用方案）; LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算（无似然度方案），同时 flow matching 轨迹拉直效应减少推理步数（代码 -41.8 步，推理 -159 步），进一步降低采样成本; Step 3.5 Flash MIS-PO 用离散过滤（接受/拒绝）替代连续重要性加权——完全消除高方差权重项，在 token 和轨迹层面限制优化在信赖域内，为 off-policy 严重的长时推理 RL 提供第五种范式（vs 结构化 mask / complementary masking / shrinkage baseline / 无似然度），在 IMO 85.4% / LiveCodeBench 86.4% frontier 难度下验证
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2026-Step35Flash]]
 - [RL-2b] 🔴 Group 构造: 同一图不同回答 vs 不同图？
 - [RL-2c] 🔴 高熵 token 分布下的 RL 正则化
   - MMaDA 保留 KL penalty, LaViDa-R1 发现 image token NLL>6 导致 KL estimator 方差极大、训练发散
@@ -203,6 +220,23 @@
   - 与 XDLM 预训练减步（混合噪声核）和 DiMOO ML-Cache 推理减步形成三层加速体系——预训练 / 后训练 / 推理各一层
   - 潜在思路: 分析对比式优化目标的隐式正则化效应；设计专门利用轨迹拉直效应的训练目标进一步放大减步效果；验证 LFPO + XDLM 双层减步的叠加效果
   - 相关论文: [[2026-LFPO]], [[2025-XDLM]], [[2025-Lumina-DiMOO]]
+- [RL-2i] 🔴 IcePop 解决策略版本不匹配，但 dLLM 还有输入分布不匹配（P-Diff-04）——是否可将 IcePop 扩展为双维度修正？
+- [RL-2j] 🔴 跨阶段蒸馏在异质模态任务（text NLL<2 vs image NLL>6）间的 advantage 归一化策略
+- [RL-2k] 🔴 RL 训练中 sparse/dynamic 计算的确定性需求 vs dLLM 推理加速的动态性冲突
+- [RL-2l] 🔴 MIS-PO 离散过滤 vs 连续重要性加权的理论统一
+  - Step 3.5 Flash MIS-PO（离散接受/拒绝过滤）和 GLM-5 IcePop（连续 pop 函数校正）代表两种根本不同的 off-policy 处理范式
+  - 离散过滤: 方差更低（完全消除高方差权重项），但信息损失（丢弃 off-policy 样本）
+  - 连续校正: 信息保留更好（重加权而非丢弃），但方差仅降低未消除
+  - 核心问题: 在什么 off-policy 严重程度下离散过滤优于连续校正？是否存在理论最优的离散化粒度？
+  - 对 dLLM 的特殊意义: image token NLL>6 导致 off-policy 极端严重，MIS-PO 的激进过滤可能更适合 dLLM RL
+  - 潜在思路: 自适应离散化（off-policy ratio 低时连续加权，高时离散过滤）；per-modality 阈值（text τ=0.9, image τ=0.7）
+  - 相关论文: [[2026-Step35Flash]], [[2026-GLM-5]]
+- [RL-2m] 🔴 MIS-PO 在异构 Reward 分布下的阈值收缩
+  - Step 3.5 Flash 用固定阈值处理三类 reward（verifiable / non-verifiable / agent），但三类 reward 的分布差异极大
+  - dLLM 面临更异构的 reward 分布: text 理解（连续评分）、image 生成（CLIP/GenEval）、grounding（IoU 二值）
+  - 核心问题: 单一阈值是否适用于 reward 分布差异极大的多模态场景？是否需要 per-reward-type MIS-PO 阈值？
+  - 潜在思路: uncertainty-weighted 阈值（根据各 reward 的置信区间动态调整）；compositional reward filtering（先一致性硬门 → 再 CLIP 过滤 → 最后 MIS-PO）
+  - 相关论文: [[2026-Step35Flash]]
 
 #### [RL-4] 🔴 轨迹级 RL vs Token 级 RL 的 Tradeoff
 - MMaDA-Parallel ParaRL 采用轨迹级优化（沿整个去噪轨迹应用 CLIP-based alignment reward）
@@ -211,6 +245,14 @@
 - 开放问题: 轨迹级 reward 在中间步骤的有效性——MMaDA-Parallel 用 CLIP 评估噪声图像，但 CLIP 在 out-of-distribution 输入上的可靠性未验证
 - 潜在思路: Process Reward Model for dLLM（评估中间去噪状态质量）；混合策略（关键步骤用轨迹 reward，其他用 token reward）
 - 相关论文: [[2025-MMaDA-Parallel]], [[2025-MMaDA]]
+
+- [RL-4a] 🔴 序列级 vs Token 级 Importance Ratio 的 Tradeoff
+  - OpenMMReasoner GSPO 使用**序列级 importance ratio**（π(seq)/π_ref(seq) 单一标量），替代 GRPO 的**token 级乘积**（∏ᵢ π(aᵢ|sᵢ)/π_ref(aᵢ|sᵢ)），训练更稳定
+  - Step 3.5 Flash MIS-PO 使用离散过滤（接受/拒绝）隐式在轨迹级操作——两者共同暗示序列/轨迹级方案在长序列场景优于 token 级
+  - 核心 tradeoff: token 级 ratio 乘积方差随序列长度 L 指数增长（长 CoT 尤其严重），但提供精细信用分配；序列级 ratio 方差被平滑但丧失 token 级分辨率
+  - 对 dLLM 的意义: image token NLL>6 导致 token 级 ratio 爆炸更严重——序列级方案可能天然更适合 dLLM RL
+  - 需要验证: GSPO 的序列级 ratio 能否通过 complementary masking 适配到 masked diffusion（GSPO-MDM）？方差界的理论推导？
+  - 相关论文: [[2025-OpenMMReasoner]], [[2026-Step35Flash]]
 
 #### [RL-5] 🟡 Test-time Scaling for dLLM
 - **核心问题**: 推理时计算投入（test-time scaling）在 dLLM 中的可行性和上界？与训练时 scaling 的 tradeoff？
@@ -240,8 +282,8 @@
     - **Rollout 策略**: 传统 VLM 直接 ×16 采样；dLLM 需要覆盖去噪时间步（complementary masking 或随机 mask ratio）
   - 开放问题: 两者的 RL 方法能否互相借鉴？GSPO 的稳定性优势能否迁移到 dLLM？GSPO 能否适配 masked diffusion？
   - 潜在思路: 抽象出与架构无关的 PG 组件（advantage 估计、reward shaping、正则化）；GSPO-MDM（将 GSPO 的 group-based advantage 适配到 masked diffusion）；统一 Policy Gradient 框架
-  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO。LFPO 是第二个仅适用于 dLLM 的 RL 组件（继 answer-forcing 后）——Theorem 3.1 依赖离散 token 空间 + cross-entropy loss 特性，无法直接迁移到 AR 模型，进一步证实 dLLM RL 正在发展出独立于 AR RL 的方法论体系
-  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-Qwen3-VL]]
+  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO。LFPO 是第二个仅适用于 dLLM 的 RL 组件（继 answer-forcing 后）——Theorem 3.1 依赖离散 token 空间 + cross-entropy loss 特性，无法直接迁移到 AR 模型，进一步证实 dLLM RL 正在发展出独立于 AR RL 的方法论体系。Step 3.5 Flash MIS-PO 是第三个架构无关的 PG 改进组件——离散过滤（接受/拒绝）替代连续重要性加权，在 off-policy 严重时完全消除高方差权重项，与 EBPO shrinkage（advantage 方差）正交（MIS-PO 降低 importance weight 方差），两者可叠加。MIS-PO vs IcePop (GLM-5) 形成离散过滤 vs 连续校正两种 off-policy 处理范式
+  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-Qwen3-VL]], [[2026-Step35Flash]], [[2026-GLM-5]]
 
 ---
 

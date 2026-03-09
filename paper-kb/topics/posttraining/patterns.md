@@ -30,3 +30,12 @@
 - **可能解释**: (1) SFT 激活被预训练压制的能力（主要贡献），RL 在 SFT 覆盖不到的分布上探索（边际贡献），test-time 在固定模型上做搜索（补丁贡献）；(2) 三者的投入产出比递减——SFT 的人均收益最高，test-time 最低但最灵活
 - **例外情况**: (1) LaViDa-R1 image editing 上 RL 贡献（+0.10）大于 SFT（+0.01），说明 SFT 数据覆盖不到时 RL 价值更高；(2) 基座很弱时 test-time scaling 收���很大（MMaDA +29.4%），但 P-RL-06 指出这是"训练不足的补丁"
 - **启示**: 最优投入优先级：SFT 数据质量 > RL 算法 > 推理时搜索。但三者正交可组合——先 SFT 冷启动，再 RL 精炼，最后 test-time scaling 做最终提升。EBPO 的 shrinkage baseline 可直接改进 RL 阶段的 GRPO 训练效率
+
+---
+
+### [P-Post-03] 推理 SFT 数据应默认不过滤或最小过滤（pre-pattern）
+- **现象**: OpenMMReasoner 明确采用 "no-filtering policy"，保留教师模型 ×8 采样的全部输出（包括"非最优但正确"的推理路径），性能反而优于 aggressive filtering。MMaDA 的 Mixed CoT SFT 使用跨领域广泛混合而非精细过滤，贡献 +47.8 GSM8K
+- **支撑论文**: [[2025-OpenMMReasoner]]（显式 no-filtering 策略优于过滤变体）、[[2025-MMaDA]]（跨域广泛混合无激进过滤，SFT 贡献远大于 RL）
+- **可能解释**: (1) **噪声正则化**: "非最优"推理路径提供 reasoning-level label smoothing，防止过拟合单一推理模式；(2) **覆盖保留**: 过滤创建系统性分布 gap——删除含 backtracking 的推理链导致模型不会从错误中恢复；(3) **探索预调**: messy 推理链降低 SFT 后策略的过度自信，为 RL 阶段保留探索空间
+- **例外情况**: (1) 教师模型在特定领域严重不准确（accuracy <50%）时需过滤错误答案（非"路径不优"而是"答案错误"）；(2) 任务有唯一正确答案且推理路径固定时（如简单分类），多样性无增量信息；(3) 纯事实性错误必须过滤
+- **启示**: 推理 SFT 数据构造应"先保留多样性，仅过滤事实性错误"。与 [P-RL-07] 互补——P-RL-07 是"多样性比规模重要"的宏观原则，P-Post-03 是"实现多样性的具体策略之一：不过滤"。**注**: 当前为 pre-pattern，MMaDA 未显式框架为 "no-filtering"，但其广泛混合做法方向一致

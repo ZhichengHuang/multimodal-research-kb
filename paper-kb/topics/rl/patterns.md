@@ -84,3 +84,30 @@
 - **可能解释**: (1) 收缩将极端估计（全 0）"拉"向全局先验，在 saturated failure 下产生 -S_q × μ_glob 的非零负梯度信号；(2) James-Stein 类收缩估计在同时估计多个均值时严格优于 sample mean（MSE 更低），这在统计学上有成熟理论保证；(3) Topic-coherent sampling 进一步降低 Welford 在线估计器在异质分布间的震荡方差
 - **例外情况**: (1) G≥32 时局部统计量已足够精确，收缩边际收益消失；(2) Gaussian 近似假设 θ_q ~ N(μ_glob, τ²) 在极度偏斜的 reward 分布（如 dLLM image token）下可能不最优；(3) Welford 在线估计器在训练早期策略快速变化时可能系统性滞后
 - **启示**: 多模态 RL 的 group size 天然受限（图像/视频生成 rollout 成本高），saturated failure 率更高（多模态推理更困难），是 shrinkage baseline 的天然应用场景。三种应对 saturated failure 的机制可分层组合：(1) EBPO shrinkage baseline（统计层面，从全失败 group 提取负向梯度，架构无关）；(2) LaViDa-R1 answer-forcing（生成层面，通过 dLLM inpainting 注入正向样本，dLLM 专有）；(3) Complementary masking w=1（估计层面，降低 likelihood 方差，dLLM 专有）。三者正交可叠加——shrinkage 改进 baseline，answer-forcing 改进 sample 质量，complementary masking 改进 likelihood 估计。**注意**: 目前仅 1 篇论文支撑且仅在纯文本 LLM 上验证，需等 dLLM 实验验证后升级为成熟 pattern
+
+---
+
+### [P-RL-09] Off-Policy 处理存在离散过滤 vs 连续校正两种正交范式
+- **现象**: Step 3.5 Flash MIS-PO 用离散过滤（接受/拒绝二元决策）替代连续重要性加权，在 token 和轨迹层面仅对信赖域内样本优化，完全消除高方差权重项。GLM-5 IcePop 用连续 pop 函数平滑校正训练-推理策略不匹配（β=2, 非对称 clipping ε_low=0.2/ε_high=0.28）。两种方法从不同角度解决异步 RL 的 off-policy 问题，均在 frontier 规模验证（Step 3.5 196B/11B, GLM-5 744B/40B）
+- **支撑论文**: [[2026-Step35Flash]]（MIS-PO 离散过滤，IMO 85.4% / LiveCodeBench 86.4%）、[[2026-GLM-5]]（IcePop 连续校正，Intelligence Index 50 分开源 #1）
+- **可能解释**: (1) 离散过滤更激进——完全丢弃 off-policy 样本消除方差，但牺牲信息（部分 off-policy 样本可能仍有价值）；(2) 连续校正更保守——保留所有样本但重加权，方差降低但不消除；(3) 两者的优劣取决于 off-policy 严重程度——极端 off-policy（长时 agent rollout）时离散过滤优势大，温和 off-policy（短文本生成）时连续校正信息利用率更高
+- **例外情况**: (1) 数据稀缺时离散过滤可能丢弃过多样本导致训练信号饥饿（需足够大 rollout 批次）；(2) MIS-PO 固定阈值假设任务同质——异构任务（数学推理 vs 创意写作）策略漂移速度不同，单一阈值可能失效；(3) 训练冷启动阶段策略接近随机，off-policy ratio 极端，两种方法都面临初始信号不足
+- **启示**: 对 dLLM RL，image token NLL>6 导致 off-policy 严重程度远超纯文本——MIS-PO 的离散过滤可能更适合 dLLM RL。两种范式与 EBPO shrinkage baseline 均正交（MIS-PO/IcePop 处理 importance weight 方差，EBPO 处理 advantage baseline 方差），三者可分层叠加。开放问题: 是否存在自适应方案（off-policy ratio 低时连续校正、高时离散过滤）？per-modality 阈值（text τ=0.9, image τ=0.7）是否可行？
+
+---
+
+### [P-RL-10] Expert Collapse ≠ Routing Collapse（MoE 训练稳定性的深层诊断）
+- **现象**: Step 3.5 Flash 和 GLM-5 独立发现——MoE 训练中专家可以出现 activation norm 归零（功能性死亡），但 routing 统计（gate probability、dispatch counts）完全正常。传统监控 routing 统计无法发现此类 collapse，必须监控 per-expert activation norm（RMS/mean at FFN intermediate），其中 max-to-median ratio 是最可靠的 early indicator
+- **支撑论文**: [[2026-Step35Flash]]（196B/11B MoE，288 routed experts，17.2T tokens 仅 1 次 loss spike）、[[2026-GLM-5]]（744B/40B MoE，256 experts，同样观察到 activation death 而非 routing collapse）
+- **可能解释**: Expert Collapse 的因果链（Step 3.5 识别）：高频 bi-gram 触发专家专门化 → pre-norm 允许单专家主导 → SwiGLU 稀疏激活放大幅度 → Muon 低秩更新加速 collapse。Routing 统计正常是因为 gate 仅决定 dispatch 比例，不反映专家内部的激活健康状态。Activation clipping（FFN intermediate 逐元素裁剪）优于 weight clipping，因为直接切断了激活放大环节
+- **例外情况**: (1) 小规模 MoE（10B 以下）可能不出现此不稳定模式；(2) 非 Muon 优化器的 collapse 根因链可能不同（Muon 特有的 Newton-Schulz 正交化是链条一环）；(3) 适度的专家专化是期望行为——"Expert Collapse"和"健康专化"的边界未被量化
+- **启示**: (1) 所有大规模 MoE 训练应将 per-expert activation norm 监控（特别是 max-to-median ratio）纳入标准监控指标，不能仅依赖 routing 统计；(2) 对多模态 MoE（如 Beyond-LM per-modality shared experts），需要 per-modality activation norm 监控——51:1 数据不平衡下视觉专家可能优先饿死；(3) Activation clipping 可能需要 per-modality 阈值（视觉 vs 语言 FFN 激活分布不同）
+
+---
+
+### [P-RL-11] 序列级/轨迹级 Importance Ratio 比 Token 级更稳定（pre-pattern）
+- **现象**: OpenMMReasoner GSPO 将 GRPO 的 token 级 importance ratio 乘积替换为序列级单一 ratio，训练"收敛更快、reward 更高、行为更稳定"。Step 3.5 Flash MIS-PO 使用离散过滤（接受/拒绝），隐式在轨迹级操作。两者共同暗示序列/轨迹级方案在长序列场景优于 token 级
+- **支撑论文**: [[2025-OpenMMReasoner]]（GSPO 序列级 ratio > GRPO token 级 ratio，在 9 个多模态推理 benchmark 上验证）、[[2026-Step35Flash]]（MIS-PO 轨迹级离散过滤，在 IMO/LiveCodeBench frontier 难度验证）
+- **可能解释**: Token 级 importance ratio 的乘积方差随序列长度 L 指数增长（∏ᵢ π/π_ref 的方差 ~ exp(L)），长 CoT 推理尤其严重。序列级 ratio 等价于 token 级的几何均值，个体波动被平滑。更小 ε clipping threshold 进一步限制更新幅度
+- **例外情况**: (1) 序列级 ratio 牺牲 token 级信用分配精细度——所有 token 获得相同 importance weight，关键推理步骤（<10% tokens）的梯度被稀释；(2) 仅 2 篇论文，且来自非常不同的场景（VLM reasoning vs frontier LLM training），需更多验证
+- **启示**: 对 dLLM RL 特别有意义——image token NLL>6 导致 token 级 ratio 爆炸更严重，序列级方案可能天然更适合。GSPO-MDM（将序列级 ratio 适配到 masked diffusion）是值得探索的方向。**注**: 当前为 pre-pattern，需 dLLM 上的实验验证后升级为成熟 pattern
