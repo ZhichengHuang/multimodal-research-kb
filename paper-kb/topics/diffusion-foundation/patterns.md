@@ -118,10 +118,10 @@
 
 ---
 
-### [P-Diff-12] dLLM RL 的四种范式：似然度近似 / 似然度降方差 / advantage 降方差 / 无似然度
-- **现象**: dLLM RL 已形成四条正交的优化路径：(1) UniGRPO（MMaDA）用结构化随机 mask ratio 近似 likelihood，方差可控但仍有近似误差；(2) Complementary Masking（LaViDa-R1）用互补 mask 和 w=1 权重降低 likelihood 估计方差，更精确但仍需 ODE 类计算；(3) EBPO 用 James-Stein shrinkage 改进 advantage baseline 估计，架构无关但不解决 likelihood 估计本身的问题；(4) LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算，在 logit 空间做精确速度场修正，是唯一的无似然度方案
-- **支撑论文**: [[2025-MMaDA]]（UniGRPO 似然度近似）、[[2026-LaViDa-R1]]（Complementary Masking 似然度降方差 + answer-forcing 训练信号恢复）、[[2026-EBPO]]（Shrinkage baseline advantage 降方差）、[[2026-LFPO]]（无似然度速度场修正）
-- **可能解释**: (1) 四种范式解决 dLLM RL 管线中的不同瓶颈——UniGRPO 和 Complementary Masking 解决 likelihood 估计，EBPO 解决 advantage baseline 估计，LFPO 从根本上消除 likelihood 估计需求；(2) 范式间的正交性使得组合成为可能——LFPO 精确梯度 + EBPO shrinkage baseline 可叠加为"精确梯度 + 稳定 advantage"双层方差降低；(3) 不同范式有不同的适用场景——LFPO 在少步推理下离散化误差可能偏大，EBPO 在大 group size 时优势消失，answer-forcing 仅适用于 dLLM
-- **例外情况**: (1) 四种范式的严格 Pareto 对比尚未在同等条件下进行——各论文使用不同基座（LLaDA vs DiffuCoder）、不同任务、不同 reward；(2) LFPO 的 Theorem 3.1 依赖连续时间极限，少步场景下精度未验证；(3) 多模态场景（高熵 image token）下各范式的表现可能与纯文本场景差异显著
-- **启示**: dLLM RL 已从单一方法（d1）发展为多范式竞争格局。最有价值的后续工作是在统一基准下对比四种范式的 Pareto 前沿（精度 × 方差 × 计算成本 × 推理步数），以及验证范式间的组合效果（尤其是 LFPO + EBPO 双层方差降低）
+### [P-Diff-12] dLLM RL 的五种范式：似然度近似 / 似然度降方差 / 似然度 bounds / advantage 降方差 / 无似然度
+- **现象**: dLLM RL 已形成五条正交的优化路径：(1) UniGRPO（MMaDA）用结构化随机 mask ratio 近似 likelihood，方差可控但仍有近似误差；(2) Complementary Masking（LaViDa-R1）用互补 mask 和 w=1 权重降低 likelihood 估计方差，更精确但仍需 ODE 类计算；(3) **SPG 三明治 bounds**——根据 advantage 符号选择性使用 ELBO（正）或 EUBO（负）构成有效下界，首次解决"最小化 ELBO 不等价于最小化 log-likelihood"的数学缺陷；(4) EBPO 用 James-Stein shrinkage 改进 advantage baseline 估计，架构无关但不解决 likelihood 估计本身的问题；(5) LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算，在 logit 空间做精确速度场修正，是唯一的无似然度方案
+- **支撑论文**: [[2025-MMaDA]]（UniGRPO 似然度近似）、[[2026-LaViDa-R1]]（Complementary Masking 似然度降方差 + answer-forcing 训练信号恢复）、[[2025-SPG]]（三明治 ELBO+EUBO bounds + block-wise masking 对齐推理结构）、[[2026-EBPO]]（Shrinkage baseline advantage 降方差）、[[2026-LFPO]]（无似然度速度场修正）
+- **可能解释**: (1) 五种范式解决 dLLM RL 管线中的不同瓶颈——UniGRPO 和 Complementary Masking 解决 likelihood 估计精度/方差，SPG 解决 likelihood bounds 的方向性偏差（负 advantage 下 ELBO 无效），EBPO 解决 advantage baseline 估计，LFPO 从根本上消除 likelihood 估计需求；(2) 范式间的正交性使得组合成为可能——LFPO 精确梯度 + EBPO shrinkage baseline 可叠加为"精确梯度 + 稳定 advantage"双层方差降低；SPG bounds + EBPO shrinkage 可叠加为"精确 likelihood + 稳定 advantage"双层改进；(3) 不同范式有不同的适用场景——LFPO 在少步推理下离散化误差可能偏大，EBPO 在大 group size 时优势消失，SPG 的 EUBO 在高熵 image token 下可能有数值问题，answer-forcing 仅适用于 dLLM
+- **例外情况**: (1) 五种范式的严格 Pareto 对比尚未在同等条件下进行——各论文使用不同基座（LLaDA vs DiffuCoder）、不同任务、不同 reward；(2) LFPO 的 Theorem 3.1 依赖连续时间极限，少步场景下精度未验证；(3) SPG 的 EUBO β-power 在 image token（NLL>6）下可能导致数值 underflow；(4) 多模态场景（高熵 image token）下各范式的表现可能与纯文本场景差异显著
+- **启示**: dLLM RL 已从单一方法（d1）发展为五范式竞争格局。最有价值的后续工作是在统一基准下对比五种范式的 Pareto 前沿（精度 × 方差 × 计算成本 × 推理步数），以及验证范式间的组合效果（尤其是 LFPO + EBPO、SPG + EBPO 双层改进）
 

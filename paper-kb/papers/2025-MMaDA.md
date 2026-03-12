@@ -125,6 +125,7 @@ aliases: [MMaDA, UniGRPO]
 - `combines_with` → [[2026-EBPO]]: EBPO 的 shrinkage baseline 可直接替换 UniGRPO 中的 GRPO baseline 估计，解决"训练信号消失问题未解决"
 - `alternative_to` → [[2026-Beyond-LM]]: 统一模型路线之争——LLaDA 初始化纯离散扩散 + 模态无关全共享 vs 从零训练 AR+连续扩散混合 + modality-specific FFN + MoE
 - `alternative_to` → [[2025-KimiK2.5]]: 架构路线对立——dLLM (masked diffusion) vs AR-based MoE (1.04T, 自回归)；同样做跨模态 RL 但实现不同（UniGRPO vs GRM+Toggle RL）；K2.5 在 AR 上独立验证跨模态协同 (P-Uni-01)
+- `combines_with` → [[2025-VTP]]: VTP 语义增强 tokenizer 可作为 MAGVIT-v2 的升级替代方案，改善 MMaDA 的 T2I 质量（GenEval Position 0.20 等弱点可能部分源于 tokenizer 语义不足）
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

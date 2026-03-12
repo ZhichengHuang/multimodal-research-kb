@@ -122,6 +122,7 @@ aliases: ["Beyond-LM", "Multimodal-Pretraining-Scratch"]
 - `conflicts_with` → [[2025-MMaDA]] / [[2025-Lumina-DiMOO]] / [[2026-LaViDa-R1]]: 根本性路线冲突——连续扩散 (flow matching) vs 离散扩散 (masked diffusion)；代表 Diffusion 原生路线中的"连续 vs 离散"分歧
 - `conflicts_with` → [[2025-DiffusionVL]]: 路线对立——Beyond-LM 从零训练证明扩散训练本身的价值 vs DiffusionVL 用 AR 初始化"免费"继承知识再做扩散微调；Beyond-LM 提供了 DiffusionVL 无法提供的"公平对比基准"
 - `alternative_to` → [[2025-KimiK2.5]]: 同为大规模 MoE 多模态预训练，但路线相反——Beyond-LM 从零训练+连续扩散+51:1 视觉:语言数据需求 vs K2.5 基于已有 K2 骨干+AR 自回归+10% 恒定视觉比例
+- `conflicts_with` → [[2025-VTP]]: Tokenizer scaling 策略分歧——Beyond-LM 用 RAE (SigLIP 2) 统一表示但 S→L scaling 退化（gFID 3.50→6.09），VTP 用 CLIP+SSL+重建三目标持续改善（gFID→1.11），暗示多目标语义增强设计更优
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

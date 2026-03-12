@@ -118,6 +118,12 @@
 - [Post-1c] 🔴 需要 RL 介入吗？→ 连接到 [RL-1]
   - 已有尝试:
   - 相关论文:
+- [Post-1d] 🔴 精确事实引用幻觉
+  - Seed2.0 暴露前沿模型的新型幻觉维度: FactScore 71.2（GPT-5.2 91.9，差距 20.7），科研分析中 PDB 编号和文献引用幻觉——属于精确事实引用而非语义级幻觉
+  - 区别于 ReDiff 解决的语义幻觉（dLLM 并行生成错误传播），精确事实引用幻觉不是并行生成的问题，而是知识表征精度的问题
+  - 即使前沿 AR 模型（FactScore 91.9）也未完全解决，说明这可能是自回归生成范式的根本限制——流畅性目标与精确引用目标存在结构性冲突
+  - 潜在思路: 检索增强（RAG）处理精确引用；事实性对齐训练（区分"合理推测"和"精确引用"两种输出模式）
+  - 相关论文: [[2026-Seed2.0]], [[2025-ReDiff]]
 
 #### [Post-2] 🟡 多模态 SFT 数据如何高效构造？
 - [Post-2a] 🔴 合成数据 vs 人工标注的质量对比
@@ -177,8 +183,8 @@
 
 #### [RL-2] 🔴 GRPO/PPO 如何适配多模态？
 - [RL-2a] 🟡 多模态采样的成本远高于纯文本，如何降低？
-  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator; Kimi K2.5 Toggle RL 从输出长度维度优化——交替预算约束/全长生成，输出 token 减少 25-30%（与 dLLM 特有技术正交的通用方案）; LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算（无似然度方案），同时 flow matching 轨迹拉直效应减少推理步数（代码 -41.8 步，推理 -159 步），进一步降低采样成本; Step 3.5 Flash MIS-PO 用离散过滤（接受/拒绝）替代连续重要性加权——完全消除高方差权重项，在 token 和轨迹层面限制优化在信赖域内，为 off-policy 严重的长时推理 RL 提供第五种范式（vs 结构化 mask / complementary masking / shrinkage baseline / 无似然度），在 IMO 85.4% / LiveCodeBench 86.4% frontier 难度下验证
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2026-Step35Flash]]
+  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator; Kimi K2.5 Toggle RL 从输出长度维度优化——交替预算约束/全长生成，输出 token 减少 25-30%（与 dLLM 特有技术正交的通用方案）; LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算（无似然度方案），同时 flow matching 轨迹拉直效应减少推理步数（代码 -41.8 步，推理 -159 步），进一步降低采样成本; Step 3.5 Flash MIS-PO 用离散过滤（接受/拒绝）替代连续重要性加权——完全消除高方差权重项，在 token 和轨迹层面限制优化在信赖域内; SPG 提供第六种范式——三明治 ELBO+EUBO bounds，对正 advantage 最大化 ELBO、负 advantage 最小化基于 Rényi divergence 的 EUBO，解决 ELBO 对负 advantage 的数学缺陷。SPG 的 block-wise masking 还揭示训练-推理分布对齐是被严重忽视的效率瓶颈（Countdown +23.9%）
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2026-Step35Flash]], [[2025-SPG]]
 - [RL-2b] 🔴 Group 构造: 同一图不同回答 vs 不同图？
 - [RL-2c] 🔴 高熵 token 分布下的 RL 正则化
   - MMaDA 保留 KL penalty, LaViDa-R1 发现 image token NLL>6 导致 KL estimator 方差极大、训练发散
@@ -208,11 +214,12 @@
   - 相关论文: [[2026-EBPO]]
 - [RL-2g] 🔴 Velocity-based vs Likelihood-based dLLM RL 的系统对比
   - LFPO 的速度场修正（无似然度，精确梯度）和 UniGRPO/complementary masking 的似然度估计（近似，有方差）代表两条根本不同的优化路径
+  - SPG 显著提升了 likelihood-based 方法的性能上界——通过三明治 ELBO+EUBO bounds 解决负 advantage 偏差，GSM8K +3.6%, Sudoku +27.0%（vs UniGRPO），使 likelihood-based vs velocity-based 的对比更加公平
   - 理论上 LFPO 消除了似然度估计方差，但 Theorem 3.1 依赖连续时间极限假设，少步推理（8-32 步）场景下离散化误差可能系统性偏大
-  - Token 级 credit assignment 被牺牲——LFPO 在时间步级别操作速度残差，关键推理步骤仅涉及 2-3 个 token 时信号被平均化；likelihood-based 方法可通过 token 级 log prob 做细粒度归因
+  - Token 级 credit assignment 被牺牲——LFPO 在时间步级别操作速度残差，关键推理步骤仅涉及 2-3 个 token 时信号被平均化；likelihood-based 方法（包括 SPG）可通过 token 级 log prob 做细粒度归因
   - 需要在相同基座（LLaDA 8B / DiffuCoder）、相同任务、相同 reward 下做严格对比——精度 vs 方差 vs 计算成本 vs 推理步数的全面 Pareto 分析
-  - 潜在思路: 混合方案——LFPO 粗粒度方向 + complementary masking 细粒度 token 级修正；自适应切换（训练早期用 LFPO 快速对齐，后期切换至 likelihood-based 精调）
-  - 相关论文: [[2026-LFPO]], [[2025-MMaDA]], [[2026-LaViDa-R1]]
+  - 潜在思路: 混合方案——LFPO 粗粒度方向 + SPG 细粒度 token 级修正；自适应切换（训练早期用 LFPO 快速对齐，后期切换至 SPG 精调）
+  - 相关论文: [[2026-LFPO]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-SPG]]
 - [RL-2h] 🔴 RL 后训练的轨迹拉直机制
   - LFPO 观察到 RL 训练后推理步数显著减少（代码 -41.8 步，推理 -159.0 步），论文归因于 flow matching 的轨迹拉直效应，但缺乏严格理论分析
   - 对比: AGRPO 在 MATH 上反而增加 +73.6 步——不同 RL 方法对推理步数的影响方向相反
@@ -268,8 +275,8 @@
 
 #### [RL-3] 🟡 RL 能提升多模态推理能力吗？
 - [RL-3a] 🟡 视觉推理 (图表/几何) 的 verifiable reward
-  - 已有尝试: MMaDA 对 GeoQA/CLEVR 用 correctness+CLIP reward, UniGRPO 提升 GSM8K +8.2; LaViDa-R1 在 MathVista +2.4; OpenMMReasoner GSPO 在 9 个 benchmark 平均 +11.6%; EBPO 在数学推理上 G=8 时 +11.28%（验证改进 advantage 估计对困难推理任务的显著效果，机制可迁移到多模态）; Kimi K2.5 视觉 RL 后文本基准微弱提升（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），方向性证据但效应量可能在噪声范围内; LFPO 在 LLaDA 8B 上 GSM8K +9.9%、MATH +7.0%，同时推理步数显著减少（-159 步），验证无似然度范式在推理任务上的有效性
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-OpenMMReasoner]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]]
+  - 已有尝试: MMaDA 对 GeoQA/CLEVR 用 correctness+CLIP reward, UniGRPO 提升 GSM8K +8.2; LaViDa-R1 在 MathVista +2.4; OpenMMReasoner GSPO 在 9 个 benchmark 平均 +11.6%; EBPO 在数学推理上 G=8 时 +11.28%（验证改进 advantage 估计对困难推理任务的显著效果，机制可迁移到多模态）; Kimi K2.5 视觉 RL 后文本基准微弱提升（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），方向性证据但效应量可能在噪声范围内; LFPO 在 LLaDA 8B 上 GSM8K +9.9%、MATH +7.0%，同时推理步数显著减少（-159 步），验证无似然度范式在推理任务上的有效性; SPG 在 LLaDA-8B-Instruct 上 GSM8K +3.6%, MATH500 +2.6%, Countdown +18.4%, Sudoku +27.0%（vs 前 SOTA），验证三明治 ELBO+EUBO bounds 在推理任务上的显著效果
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-OpenMMReasoner]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-SPG]]
 - [RL-3b] 🔴 RL 对 grounding 能力的影响
   - 相关论文: [[2026-LaViDa-R1]]
 - [RL-3c] 🔴 传统 VLM RL vs dLLM RL 的方法论差异
@@ -282,8 +289,8 @@
     - **Rollout 策略**: 传统 VLM 直接 ×16 采样；dLLM 需要覆盖去噪时间步（complementary masking 或随机 mask ratio）
   - 开放问题: 两者的 RL 方法能否互相借鉴？GSPO 的稳定性优势能否迁移到 dLLM？GSPO 能否适配 masked diffusion？
   - 潜在思路: 抽象出与架构无关的 PG 组件（advantage 估计、reward shaping、正则化）；GSPO-MDM（将 GSPO 的 group-based advantage 适配到 masked diffusion）；统一 Policy Gradient 框架
-  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO。LFPO 是第二个仅适用于 dLLM 的 RL 组件（继 answer-forcing 后）——Theorem 3.1 依赖离散 token 空间 + cross-entropy loss 特性，无法直接迁移到 AR 模型，进一步证实 dLLM RL 正在发展出独立于 AR RL 的方法论体系。Step 3.5 Flash MIS-PO 是第三个架构无关的 PG 改进组件——离散过滤（接受/拒绝）替代连续重要性加权，在 off-policy 严重时完全消除高方差权重项，与 EBPO shrinkage（advantage 方差）正交（MIS-PO 降低 importance weight 方差），两者可叠加。MIS-PO vs IcePop (GLM-5) 形成离散过滤 vs 连续校正两种 off-policy 处理范式
-  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-Qwen3-VL]], [[2026-Step35Flash]], [[2026-GLM-5]]
+  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO。LFPO 是第二个仅适用于 dLLM 的 RL 组件（继 answer-forcing 后）——Theorem 3.1 依赖离散 token 空间 + cross-entropy loss 特性，无法直接迁移到 AR 模型，进一步证实 dLLM RL 正在发展出独立于 AR RL 的方法论体系。Step 3.5 Flash MIS-PO 是第三个架构无关的 PG 改进组件——离散过滤（接受/拒绝）替代连续重要性加权，在 off-policy 严重时完全消除高方差权重项，与 EBPO shrinkage（advantage 方差）正交（MIS-PO 降低 importance weight 方差），两者可叠加。MIS-PO vs IcePop (GLM-5) 形成离散过滤 vs 连续校正两种 off-policy 处理范式。SPG 是第四个 dLLM 专有的 RL 组件——通过 Rényi divergence 推导 EUBO 实现三明治 bounds（依赖 masked diffusion 的 ELBO 结构），对负 advantage 提供数学上正确的惩罚信号，同时 block-wise masking 揭示训练-推理分布对齐的重要性
+  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-Qwen3-VL]], [[2026-Step35Flash]], [[2026-GLM-5]], [[2025-SPG]]
 
 ---
 
@@ -418,38 +425,66 @@
   - 相关论文:
 - [Tok-1c] 🔴 残差量化 (RQ) vs 单层量化的深度对比
 
-#### [Tok-2] 🟡 理解和生成对 Tokenizer 的矛盾需求（核心瓶颈）
-- [Tok-2a] 🟡 理解需要语义丰富表示 (CLIP-like) vs 生成需要像素级细节 (VQGAN-like)
-  - 这是统一 tokenizer 的根本矛盾
+#### [Tok-2] 🟢 理解和生成对 Tokenizer 的矛盾需求（核心瓶颈 → VTP 证明非矛盾）
+- [Tok-2a] 🟢 理解需要语义丰富表示 (CLIP-like) vs 生成需要像素级细节 (VQGAN-like)
+  - ~~这是统一 tokenizer 的根本矛盾~~ → VTP 证明这是**伪命题**：语义目标不与生成矛盾，反而是生成 scaling 的必要条件
   - DiMOO 证明纯 VQ token（aMUSEd-VQ，无独立视觉编码器）通过大规模数据（~110M）可达 MMMU 58.6%——语义不足可被数据弥补
   - LaViDa-O 采用 SigLIP+VQ 双路方案——理解用 SigLIP 语义，生成用 VQ 离散 token
   - Beyond-LM 提供第三条路径: RAE (Representation Autoencoder, SigLIP 2) 统一表示——单一连续编码器同时服务理解和生成，避免 VQ 离散化信息瓶颈
-  - 三种策略: 「用数据换简洁性」(DiMOO 纯 VQ) vs 「用架构换数据效率」(LaViDa-O 双路) vs 「用连续表示换统一性」(Beyond-LM RAE)
-  - 相关论文: [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2026-Beyond-LM]]
+  - **VTP 证明语义增强是生成 scaling 的必要条件**: 纯重建 tokenizer 出现 anti-scaling（gFID 55→58.56 恶化），而 CLIP+SSL+重建三目标联合训练实现持续改善（gFID→1.11）。将讨论从"三种等价策略"推进为"语义增强是必须的"
+  - 三种策略: 「用数据换简洁性」(DiMOO 纯 VQ) vs 「用架构换数据效率」(LaViDa-O 双路) vs 「用连续表示换统一性」(Beyond-LM RAE) → VTP 证明无论哪种路线，语义目标都应纳入 tokenizer 训练
+  - 相关论文: [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2026-Beyond-LM]], [[2025-VTP]]
 - [Tok-2b] 🔴 Janus 的解耦方案是否是最优解？
   - 解耦解决了矛盾, 但失去了理解-生成的表示共享
   - 表示不共享是否限制了涌现能力？
   - 已有尝试:
   - 相关论文:
-- [Tok-2c] 🔴 有没有可能训出同时满足两者的统一 Tokenizer？
+- [Tok-2c] 🟡 有没有可能训出同时满足两者的统一 Tokenizer？
   - 多目标训练: reconstruction + semantics
   - 分层表示: 高层语义 + 底层细节
-  - 已有尝试:
-  - 相关论文:
+  - **VTP 首次证明可行**: 连续 64 维 tokenizer 通过 CLIP+DINOv2+重建三目标联合训练，同时达到 rFID 0.36（重建）+ zero-shot 78.2%（语义）+ gFID 1.11（生成），三个维度均 competitive
+  - 但仅在连续 latent 上验证，离散 VQ 上的可行性未知（codebook collapse 风险）
+  - 已有尝试: VTP（连续 latent，三目标联合训练）
+  - 相关论文: [[2025-VTP]]
+- [Tok-2c-1] 🔴 多目标 Tokenizer 的权重平衡
+  - VTP 使用 λ_rec=0.1, λ_clip=1, λ_ssl=1，但这是经验值
+  - 核心问题: 最优权重是否跨任务/跨数据/跨架构稳定？不同下游任务（T2I, I2I, 理解）可能偏好不同的 latent space 结构
+  - 潜在思路: Pareto 前沿分析——扫描权重空间，测量 rFID vs gFID vs zero-shot 的 tradeoff 曲面；curriculum learning（训练早期侧重重建，后期增加语义目标权重）
+  - 相关论文: [[2025-VTP]]
 - [Tok-2d] 🟡 MAGVIT-v2 是否是当前 dLLM 统一模型生成质量的主要瓶颈？
   - MMaDA 使用 MAGVIT-v2 (codebook 8192, 512×512), T2I 与 FLUX/SD3 有明显差距
   - DiMOO 使用 aMUSEd-VQ (codebook 8192, 16×16) 达 GenEval 88%，说明 tokenizer 非唯一瓶颈——训练数据量同样关键
   - DiMOO 纯 VQ 在低级视觉任务（super-res, dehazing）表现弱——VQ 信息损失在细粒度任务上确实是瓶颈
   - 需区分: 多少差距来自 tokenizer 信息损失 vs 模型容量/训练数据不足
   - 潜在思路: 语义增强 VQ (CLIP contrastive + reconstruction dual loss)；多尺度 VQ
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]]
+  - **VTP 提供关键实证**: 纯重建 tokenizer 的 anti-scaling（gFID 55→58.56 恶化）证明 tokenizer 质量上界由**语义信息密度**而非重建保真度决定。VTP 通过语义增强将 gFID 推至 1.11
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-VTP]]
 
-#### [Tok-3] 🔴 Tokenizer 对下游训练的影响
-- [Tok-3a] 🔴 Tokenizer 质量对生成质量的上界限制
+#### [Tok-3] 🟡 Tokenizer 对下游训练的影响
+- [Tok-3a] 🟡 Tokenizer 质量对生成质量的上界限制
   - DiMOO 纯 VQ token 在低级视觉任务上的信息瓶颈——16×16 下采样天然丢失像素级细节
-  - 潜在思路: 多尺度 VQ（低分辨率语义 + 高分辨率细节）；混合连续-离散 token 方案
-  - 相关论文: [[2025-Lumina-DiMOO]]
-- [Tok-3b] 🔴 Tokenizer 和主模型是否需要联合训练？
+  - **VTP 量化了 anti-scaling 现象**: 纯重建 tokenizer 的 rFID 改善（2.0→0.5）但 gFID 恶化（55→58.56），证明重建质量不等于生成质量。Tokenizer 质量上界由语义信息密度决定
+  - VTP 通过 CLIP+SSL+重建三目标将 gFID 推至 1.11，同时 rFID 0.36——证明语义增强可同时提升重建和生成
+  - 潜在思路: 多尺度 VQ（低分辨率语义 + 高分辨率细节）；混合连续-离散 token 方案；将 VTP 多目标训练应用到离散 VQ tokenizer
+  - 相关论文: [[2025-Lumina-DiMOO]], [[2025-VTP]]
+- [Tok-3b] 🟡 Tokenizer 和主模型是否需要联合训练？
+  - VTP 证明 tokenizer 预训练策略（多目标 vs 单目标）对下游生成质量有**一阶影响**——相同下游模型（DiT），仅更换 tokenizer 即可从 gFID 58.56 改善到 2.03
+  - 当前所有 KB 统一模型使用冻结 tokenizer（aMUSEd-VQ, MAGVIT-v2, SigLIP2），未探索联合训练
+  - 潜在思路: 端到端联合训练 tokenizer + 生成模型；或分阶段——先用 VTP 训练语义增强 tokenizer，再训练下游模型
+  - 相关论文: [[2025-VTP]]
+- [Tok-3c] 🔴 连续 vs 离散 Latent 在统一模型中的系统性对比
+  - VTP 使用连续 64 维 latent（rFID 0.36, gFID 1.11, zero-shot 78.2%），KB 中 dLLM 统一模型使用离散 VQ token
+  - 核心问题: 连续 latent 在 diffusion 生成上更优，但离散 token 与 LLM token 框架天然对齐——哪种更适合 dLLM 统一模型？
+  - 需要在相同下游模型上对比: VTP（连续）vs 语义增强 VQ（离散）
+  - 潜在思路: 训练两种 tokenizer 在相同数据上，评估相同下游任务；或探索"连续 encoder + 离散 quantizer"的混合方案
+  - 相关论文: [[2025-VTP]], [[2025-Lumina-DiMOO]], [[2026-Beyond-LM]]
+
+#### [Tok-4] 🔴 语义 Tokenizer 的 Scaling Law
+- VTP 展示了语义 tokenizer 的 scaling 行为与纯重建 tokenizer 根本不同（持续改善 vs anti-scaling），但缺乏系统性 scaling law
+- 核心问题: encoder size × data size × 目标组合如何影响下游生成质量？最优 tokenizer 规模是否与下游模型规模相关？
+- 已有数据点: VTP encoder 20M→300M params, data 100K→100M samples
+- 潜在思路: 系统性 scaling study {encoder 20M-1B} × {data 10M-1B} × {rec, rec+CLIP, rec+SSL, rec+CLIP+SSL}；推导 gFID ∝ (compute)^α 的 scaling exponent
+- 相关论文: [[2025-VTP]], [[2026-Beyond-LM]]
 
 ---
 
@@ -535,13 +570,19 @@
 - [Uni-4b] 🔴 时序建模: AR 时序 + Diffusion 空间的混合
 - [Uni-4c] 🔴 视频理解和生成的统一是否比图像更难？
 - [Uni-4d] 🔴 世界模型视角: 视频生成 = 物理规律学习？
+- [Uni-4e] 🔴 长视频理解的自适应计算分配策略
+  - 两种互补路线: (1) VidLaDA MARS-Cache 全量低帧率（帧级 chunk attention + anchor 复用，12.5× 加速，精度几乎无损）; (2) Seed2.0 VideoCut 选择性高帧率回放（模型主动调用工具回看关键片段）
+  - 核心问题: 模型如何学会"何时需要回看"？VideoCut 存在回放-理解循环依赖（需先理解才能定位片段，但需回放才能理解）
+  - 两种路线的 tradeoff: 全量低帧率计算效率高但可能错过关键细节；选择性高帧率信息保真但依赖准确的片段定位
+  - 潜在思路: 两种策略的混合——低帧率初扫 + 置信度驱动的高帧率回放；将 dLLM mask 机制用于帧选择（mask 低信息帧）
+  - 相关论文: [[2025-VidLaDA]], [[2026-Seed2.0]]
 
 #### [Uni-5] 🟡 统一模型的 Post-training 和 RL
 - [Uni-5a] 🟡 统一模型如何做 alignment？
   - 理解和生成分别对齐 vs 联合对齐
-  - 已有方案: MMaDA 提供首个 diffusion-native 全链路（预训练→Mixed CoT SFT→UniGRPO RL）; LaViDa-R1 提供统一 PG 框架（SFT+GRPO+self-distillation）; DiMOO 提供四阶段管线 + Self-GRPO 联合 RL; EBPO 的 shrinkage baseline 可作为架构无关的 advantage 估计改进，直接嵌入任何 GRPO 变体; LFPO 提供无似然度的速度场修正范式，天然规避 KL 在高熵 image token 下的方差问题
-  - dLLM RL 已形成四种范式: 似然度近似(UniGRPO) / 似然度降方差(complementary masking) / advantage 降方差(EBPO) / 无似然度(LFPO)
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2026-LFPO]]
+  - 已有方案: MMaDA 提供首个 diffusion-native 全链路（预训练→Mixed CoT SFT→UniGRPO RL）; LaViDa-R1 提供统一 PG 框架（SFT+GRPO+self-distillation）; DiMOO 提供四阶段管线 + Self-GRPO 联合 RL; EBPO 的 shrinkage baseline 可作为架构无关的 advantage 估计改进，直接嵌入任何 GRPO 变体; LFPO 提供无似然度的速度场修正范式，天然规避 KL 在高熵 image token 下的方差问题; [[2026-GLM-5]]（cross-stage distillation: SFT→RL 知识蒸馏）
+  - dLLM RL 已形成五种范式: 似然度近似(UniGRPO) / 似然度降方差(complementary masking) / 似然度 bounds(SPG 三明治 ELBO+EUBO) / advantage 降方差(EBPO) / 无似然度(LFPO)
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2026-LFPO]], [[2026-GLM-5]], [[2025-SPG]]
 - [Uni-5b] 🟡 统一模型的 reward 如何设计？→ 连接到 [RL-1c]
   - 理解正确性 + 生成质量 + 一致性 的多目标 reward
   - 已有方案: MMaDA Diversified Reward (correctness/format/CLIP/ImageReward), LaViDa-R1 Multi-Reward (correctness/IoU/EditScore), DiMOO Self-GRPO (模型自身理解能力作为隐式 reward)
@@ -555,6 +596,15 @@
   - DiMOO 的联合目标 L(θ) = -∑w(g)(ℓ_T2I + ℓ_MMU) + β·KL，明确将 T2I 和理解 loss 绑定在同一优化中
   - 但机制不清晰: 是共享表示的迁移还是任务间正则化？dLLM 中的联合优化 vs AR 中的顺序训练后迁移，机制可能不同
   - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-KimiK2.5]]
+
+#### [Uni-7] 🔴 多模态 Agent 在线纠错
+- KB 中完全缺失的研究维度——Seed2.0 GUI Agent 展示了在线状态依赖闭环纠错的价值（FreeCAD/CapCut 操作中自反思诊断+纠正）
+- 核心挑战: GUI 交互是状态依赖的，一个操作的成功依赖于之前建立的正确状态。错误累积可能导致无法恢复到已知状态
+- 与 KB 中已有方法的潜在组合: (1) ReDiff 的训练时错误建模——将合成错误注入扩展到 Agent 操作序列的错误模拟; (2) dLLM infilling 能力——将 Agent 错误状态作为 masked 序列，用 infilling "修复"状态
+- [Uni-7a] 🔴 Agent 纠错的在线学习机制
+  - 如何在执行过程中检测异常状态并准确诊断原因？
+  - 纠错成功率和错误级联的量化分析完全缺失
+  - 相关论文: [[2026-Seed2.0]]
 
 #### [Uni-6] 🔴 Thinking-Aware Image Synthesis 的评估标准
 - MMaDA-Parallel 提出 ParaBench（300 challenging prompts，6 维度评估：text quality, text alignment, image quality, image alignment, image consistency, cross-modal output alignment）

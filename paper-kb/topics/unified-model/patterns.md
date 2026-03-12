@@ -37,7 +37,7 @@
 - **现象**: Beyond-LM 发现 MoE 架构（per-modality shared experts, G=16）将视觉-语言扩展律指数差距从 0.10（dense）缩小到 0.05，在相同激活参数下性能匹配或超过 dense 模型。MoE 自然涌现模态专家分化，无需显式监督。Qwen3-VL 在 AR 侧进一步验证: 32B-MoE（64 experts, top-8 routing, entropy regularization）仅损失 1.2% 性能但降低 40% 推理延迟，提供了 AR 侧多模态 MoE 实用性的最完整数据。
 - **支撑论文**: [[2026-Beyond-LM]]（MoE 扩展律系统性研究，per-modality shared experts）、[[2025-Qwen3-VL]]（AR 侧 64e/top-8 MoE，40% latency ↓ / 1.2% quality ↓，entropy regularization 防 collapse）
 - **可能解释**: (1) Per-modality shared experts 为每个模态提供基础能力保障，routing experts 实现任务级专业化；(2) MoE 的稀疏激活允许更大的总参数量，为数据饥渴的视觉模态提供更多容量；(3) 自然涌现的专家分化减少了跨模态干扰；(4) Entropy regularization 确保所有 expert 被利用，防止少数 expert 垄断
-- **例外情况**: (1) 仅在预训练阶段验证，后训练和 RL 阶段的 scaling law 未知；(2) 51:1 的视觉-语言数据不平衡可能导致 routing collapse；(3) 最优 granularity (G) 和 expert 数量尚无系统性指导；(4) 长视频场景下大量同质视觉 token 趋向相同 expert，造成路由热点和推理延迟波动（Qwen3-VL AP-7）；(5) Entropy reg 强度需权衡——过高破坏合理的视觉/语言专家分化，过低无法防 collapse
+- **例外情况**: (1) 仅在预训练阶段验证，后训练和 RL 阶段的 scaling law 未知；(2) 51:1 的视觉-语言数据不平衡可能导致 routing collapse；(3) 最优 granularity (G) 和 expert 数量尚无系统性指导；(4) 长视频场景下大量同质视觉 token 趋向相同 expert，造成路由热点和推理延迟波动（Qwen3-VL AP-7）；(5) Entropy reg 强度需权衡——过高破坏合理的视觉/语言专家分化，过低无法防 collapse；(6) **Expert Collapse 警示**: Step 3.5 Flash 和 GLM-5 独立发现 MoE 训练中专家可出现 activation norm 归零（功能性死亡）但 routing 统计完全正常——传统监控无法发现此类 collapse，必须监控 per-expert activation norm（详见 [[P-RL-10]]）
 - **启示**: MoE 是 LaViDa-O Elastic-MoT 任务级路由的自动化替代方案，可作为统一模型扩展的默认架构选择。需要进一步研究 MoE 配置空间（G/E/shared expert 设计）在不同训练阶段的最优值。dLLM + MoE 的组合（并行生成 + 稀疏计算）是待验证的第八个推理加速维度。
 
 ---
@@ -57,6 +57,15 @@
 - **可能解释**: (1) Interleaved token sequence 使文本和图像在同一去噪过程中互相约束，错误可被双向纠正；(2) Unified mask prediction 使跨模态对齐在训练时隐式优化；(3) 局部性原理——相关的文本和图像 token 空间上相邻，缩短跨模态信息流路径
 - **例外情况**: (1) 文本-图像因果依赖强的任务（如"先描述图像再根据描述生成新图像"）天然是 sequential 的，parallel 会破坏因果链；(2) 极端长度不对称（1024 文本 vs 256 图像 token）导致某模态梯度信号被稀释；(3) Interleaving 策略任意性——如何决定哪些 token 交错尚无系统方法
 - **启示**: 并行生成是解决错误传播的架构层面方案，与 ReDiff 的训练层面方案（精炼训练）正交互补。未来方向：并行生成 + 主动精炼组合；基于语义对应的 interleaving 策略；混合 parallel-sequential 架构（根据任务类型动态选择）
+
+---
+
+### [P-Uni-07] 长视频理解存在"全量低帧率" vs "选择性高帧率"两条互补路线
+- **现象**: VidLaDA MARS-Cache 采用全量低帧率策略（帧级 chunk attention + adaptive anchor token + 模态异步刷新，12.5× 加速，精度几乎无损 MLVU 50.7% vs 50.2%），对所有帧平等处理但帧率受限。Seed2.0 VideoCut 采用选择性高帧率策略（模型主动调用工具回放关键片段以更高 FPS 重新观察），允许对关键片段投入更多计算。两者代表长视频理解的两种正交计算分配范式
+- **支撑论文**: [[2025-VidLaDA]]（MARS-Cache 全量低帧率，12.5× 加速，33.6 TPS）、[[2026-Seed2.0]]（VideoCut 选择性高帧率回放，VideoReasonBench 77.8 超人类 73.8）
+- **可能解释**: (1) 长视频信息密度不均匀——关键事件集中在短暂片段中，全量低帧率可能错过关键细节，选择性高帧率可精准分配计算; (2) VideoCut 相当于给予模型"选择性注意力"，类比人类观看长视频时的"快进+回看"模式; (3) MARS-Cache 的优势在训练和效率层面（无需 tool-use 训练），VideoCut 的优势在灵活性层面（按需精细分析）
+- **例外情况**: (1) VideoCut 存在"鸡生蛋"问题——需先理解视频才能定位关键片段，但需回放片段才能理解; (2) 视频内容均匀分布（如监控视频）时 VideoCut 增加开销但无收益; (3) MARS-Cache 的帧级 chunk attention 在极快运动场景可能丢失帧间关联
+- **启示**: 两种路线正交可组合——"低帧率初扫（MARS-Cache）+ 置信度驱动的高帧率回放（VideoCut）"是理论最优方案。对 dLLM，可探索用 mask 机制实现自适应帧选择（mask 低信息帧的 token，保留高信息帧的 token，天然契合 masked diffusion 的计算模式）
 
 ---
 

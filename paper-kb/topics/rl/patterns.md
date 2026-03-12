@@ -24,12 +24,12 @@
 
 ---
 
-### [P-RL-02] dLLM RL 的 Log-Likelihood 估计需覆盖完整去噪时间步
-- **现象**: 固定 mask ratio（如 d1 的 t=1 全 mask）劣于动态覆盖策略。MMaDA 的随机 mask ratio p∈[0,1] 优于 d1；LaViDa-R1 的 complementary masking (w=1) 在互补覆盖和方差降低上进一步改进。Complementary masking 技术源自 LaViDa 的训练效率优化（ScienceQA +67% on 200K subset），后被 LaViDa-R1 扩展为 RL likelihood estimator
-- **支撑论文**: [[2025-LaViDa]]（Complementary Masking 原创，训练场景的 antithetic 方差降低）、[[2025-MMaDA]]（结构化随机 mask ratio 优于 d1 的固定策略）、[[2026-LaViDa-R1]]（complementary masking 覆盖全部 token，w=1 避免权重不平衡）
-- **可能解释**: 完整覆盖时间步提供更准确的 ELBO 估计，减少 train-inference gap；i.i.d. 采样有遗漏问题，互补（antithetic）采样降低方差约一半
-- **例外情况**: 当序列很短时，覆盖策略的差异不显著
-- **启示**: dLLM RL 的 likelihood 估计方案仍有改进空间——目前最优的 complementary masking 仍是经验选择，可能存在理论更优的方案（importance sampling / control variates）
+### [P-RL-02] dLLM RL 的 Log-Likelihood 估计需覆盖完整去噪时间步 + 对齐推理结构
+- **现象**: 固定 mask ratio（如 d1 的 t=1 全 mask）劣于动态覆盖策略。MMaDA 的随机 mask ratio p∈[0,1] 优于 d1；LaViDa-R1 的 complementary masking (w=1) 在互补覆盖和方差降低上进一步改进。Complementary masking 技术源自 LaViDa 的训练效率优化（ScienceQA +67% on 200K subset），后被 LaViDa-R1 扩展为 RL likelihood estimator。**新增维度**: SPG 的 block-wise masking 揭示了**masking 结构**同样关键——按推理时的 semi-AR block 结构（前面 clean + 中间随机 mask + 后面全 mask）生成 MC 样本，在 Countdown 上比 random masking 提升 +23.9%，说明训练-推理分布对齐是被严重忽视的效率瓶颈
+- **支撑论文**: [[2025-LaViDa]]（Complementary Masking 原创，训练场景的 antithetic 方差降低）、[[2025-MMaDA]]（结构化随机 mask ratio 优于 d1 的固定策略）、[[2026-LaViDa-R1]]（complementary masking 覆盖全部 token，w=1 避免权重不平衡）、[[2025-SPG]]（block-wise masking 对齐 semi-AR 推理结构，Countdown +23.9%）
+- **可能解释**: (1) 完整覆盖时间步提供更准确的 ELBO 估计，减少 train-inference gap；(2) i.i.d. 采样有遗漏问题，互补（antithetic）采样降低方差约一半；(3) **masking 结构对齐**: LLaDA 推理时实际遇到的中间状态是结构化的（block-wise semi-AR 顺序），random masking 生成的中间状态与此严重不匹配。Block-wise masking 消除此分布偏移，使 MC 估计更准确
+- **例外情况**: 当序列很短时，覆盖策略和结构的差异不显著；SPG 的 block-wise masking 训练后在 random unmasking 推理下仍泛化良好（Figure 6），说明结构对齐更多是改善训练质量而非限制推理策略
+- **启示**: dLLM RL 的 likelihood 估计方案有三个维度需优化：(1) 时间步覆盖（complementary masking）；(2) masking 结构（block-wise masking）；(3) 上下界选择（SPG 的三明治策略）。三个维度正交可叠加
 
 ---
 

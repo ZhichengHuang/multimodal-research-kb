@@ -4,7 +4,7 @@ authors: [Zhihao He, Tieyuan Chen, Kangyu Wang, Ziran Qin, Yang Shao, Chaofan Ga
 date: 2025-01
 venue: ICML
 url: "https://arxiv.org/abs/2601.17868"
-tags: [diffusion, architecture, understanding]
+tags: [diffusion, architecture, understanding, video]
 category: diffusion-foundation/dllm-understanding
 level: 2
 status: read

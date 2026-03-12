@@ -6,7 +6,7 @@
 
 ## Stage 0: 知识库预检索 (Obsidian CLI)
 
-如果 `obsidian` CLI 可用（通过 `which obsidian` 检查），在阅读论文前:
+如果 `obsidian` CLI 可用（通过 `obsidian help` 检查），在阅读论文前:
 
 1. `obsidian search "<论文关键词>"` — 搜索已有相关内容
 2. `obsidian tags` — 查看已有标签体系，确保新论文标签一致

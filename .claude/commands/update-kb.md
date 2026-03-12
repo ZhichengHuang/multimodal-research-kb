@@ -7,7 +7,7 @@
 
 ## Task 0: 知识库结构健康检查 (Obsidian CLI)
 
-如果 `obsidian` CLI 可用（通过 `which obsidian` 检查），执行以下检查:
+如果 `obsidian` CLI 可用（通过 `obsidian help` 检查），执行以下检查:
 
 1. **孤立论文检测**: `obsidian orphans`
    → 找到没有任何链接的论文，建议添加关联

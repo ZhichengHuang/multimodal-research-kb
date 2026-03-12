@@ -113,6 +113,7 @@ dLLM 的双向生成能力（bidirectional inpainting）不仅是推理时的优
 - `combines_with` → [[2025-dMLLM-TTS]]: dMLLM-TTS 的 test-time scaling（HTS 搜索）可在 LaViDa-R1 训练后进一步提升推理质量；LaViDa-R1 的 tree search 是训练时探索，dMLLM-TTS 是推理时搜索
 - `combines_with` → [[2025-SDAR-VL]]: SDAR-VL 的块状扩散训练稳定性优化（ABNS/EMRS/PBNC）可迁移到 LaViDa-R1 骨干的预训练阶段
 - `alternative_to` → [[2025-KimiK2.5]]: 多模态 RL 方案对比——dLLM RL (answer-forcing + complementary masking) vs AR RL (GRM + Toggle RL)；K2.5 在 AR MoE 上独立验证跨模态正迁移
+- `alternative_to` → [[2025-SPG]]: 改善 dLLM likelihood 估计的不同维度——complementary masking 降低 MC 方差（覆盖范围），SPG block-wise masking 对齐推理结构（分布匹配）+ 三明治 bounds 解决负 advantage 偏差；两者可组合
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 
