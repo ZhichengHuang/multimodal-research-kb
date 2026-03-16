@@ -24,7 +24,8 @@ aliases: [SDAR-VL, ABNS, EMRS, PBNC]
 ## 与已有工作的关系
 - **继承自**: [[2025-LaViDa]]（masked diffusion 训练范式和 Complementary Masking 思想），[[2025-LLaDA-V]]（dLLM 做多模态理解，bidirectional attention 优势），[[LLaDA]]（masked diffusion 训练目标和推理流程）
 - **对比**: [[2025-MMaDA]]（标准 masked diffusion + UniGRPO RL vs 块状扩散 + ABNS/EMRS/PBNC），[[2025-ReDiff]]（错误修正训练 vs 训练稳定性优化），[[2025-Muddit]]（Vision-first vs LLM-first）
-- **互补**: [[2026-LaViDa-R1]]（RL 后训练框架可迁移），[[2025-LaViDa]]（Complementary Masking 与 ABNS 可组合），[[2025-Lumina-DiMOO]]（ML-Cache 推理加速与块状处理互补）
+- **互补**: [[2026-LaViDa-R1]]（RL 后训练框架可迁移），[[2025-LaViDa]]（Complementary Masking 与 ABNS 可组合），[[2025-Lumina-DiMOO]]（ML-Cache 推理加速与块状处理互补），[[2026-StableDRL]]（StableDRL 使用 SDAR-8B 作为块状扩散基座验证 RL，AIME'24 16.7%）
+- **被诊断**: [[2026-NAP]]（NAP 诊断 SDAR-VL 块状扩散同为 block-wise 解码，落入 ARness 诊断框架）
 
 <!-- ==================== Level 2: 方法拆解 (重要论文, 15min) ==================== -->
 
@@ -111,6 +112,7 @@ aliases: [SDAR-VL, ABNS, EMRS, PBNC]
 - `combines_with` → [[2026-LaViDa-R1]]: LaViDa-R1 的 RL 后训练框架（answer-forcing, tree search）可迁移到 SDAR-VL 骨干上提升推理能力
 - `combines_with` → [[2025-LaViDa]]: LaViDa 的 Complementary Masking（token 覆盖）与 SDAR-VL 的 ABNS（块级噪声多样性）可组合使用
 - `combines_with` → [[2025-Lumina-DiMOO]]: DiMOO 的 ML-Cache（推理加速）与 SDAR-VL 的块状处理（训练稳定）正交互补
+- `combines_with` → [[2026-StableDRL]]: StableDRL 的阶梯注意力首次为块状扩散模型（SDAR-8B）提供可行的 RL 训练方案（O(1) 无泄露 ELBO 评估）。SDAR-VL 的 ABNS/EMRS/PBNC 解决预训练稳定性，StableDRL 解决 RL 训练稳定性——双层稳定性优化
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

@@ -45,9 +45,10 @@
 ### [P-RL-04] dLLM RL 中 KL 正则化的有效性与 token 分布特性相关（非二元争议）
 - **现象**: MMaDA (UniGRPO) 和 DiMOO (Self-GRPO) 保留 KL 正则化，训练稳定。LaViDa-R1 发现 image token NLL>6 时 KL estimator 方差极大导致训练发散，移除 KL 改用 SFT loss 作为隐式正则化后训练更稳定。MMaDA-Parallel ParaRL 的 KL 策略未知，但基于 MMaDA 经验可能保留 KL
 - **支撑论文**: [[2025-Lumina-DiMOO]]（保留 KL，Self-GRPO 在 1024² 下训练稳定）、[[2026-LaViDa-R1]]（移除 KL，NLL>6 导致发散）、[[2025-MMaDA]]（保留 KL，UniGRPO 稳定）、[[2025-MMaDA-Parallel]]（KL 策略未明确，可能保��）
-- **可能解释**: KL 有效性不是二元选择（保留 vs 移除），而是连续谱，取决于多个因素：(1) **image token 占比**——DiMOO 在 4096+ image tokens + 较少 text tokens 场景下仍稳定，但其 aMUSEd-VQ (codebook 8192) 的 token 分布可能比 LaViDa-R1 使用的 tokenizer 更集中（熵更低）；(2) **序列总长度**——长序列中 KL 估计的方差累积更大；(3) **KL 系数 β**——DiMOO 可能使用较小的 β 值压制方差；(4) **codebook 特性**——不同 VQ tokenizer 的离散分布形态（均匀 vs 偏斜）直接影响 KL 估计质量。EBPO 的 shrinkage baseline 提供了第三条路径——不修改 KL 项，而是通过更好的 advantage baseline 降低整体训练方差
-- **例外情况**: 纯文本 RL 中 KL 正则化普遍有效（token 分布熵较低）；当 image token 占比低或使用低熵 codebook 时 KL 可能仍然安全
-- **启示**: dLLM RL 的正则化策略可能需要根据 token 分布特性（熵、NLL、codebook 大小、image token 占比）自适应选择——在低熵条件下保留 KL，高熵条件下用 SFT 正则化替代。理论上需要推导离散高熵分布下 KL estimator 的方差界
+- **可能解释**: KL 有效性不是二元选择（保留 vs 移除），而是连续谱，取决于多个因素：(1) **image token 占比**——DiMOO 在 4096+ image tokens + 较少 text tokens 场景下仍稳定，但其 aMUSEd-VQ (codebook 8192) 的 token 分布可能比 LaViDa-R1 使用的 tokenizer 更集中（熵更低）；(2) **序列总长度**——长序列中 KL 估计的方差累积更大；(3) **KL 系数 β**——DiMOO 可能使用较小的 β 值压制方差；(4) **codebook 特性**——不同 VQ tokenizer 的离散分布形态（均匀 vs 偏斜）直接影响 KL 估计质量。EBPO 的 shrinkage baseline 提供了第三条路径——不修改 KL 项，而是通过更好的 advantage baseline 降低整体训练方差。**StableDRL 提供第四条路径**——无条件裁剪在 ratio 空间施加硬约束 [1-ε, 1+ε]，完全绕过 KL 估计，通过限制 importance ratio 范围隐式约束策略偏移速度。这是唯一不需要任何分布估计的正则化方案
+- **例外情况**: 纯文本 RL 中 KL 正则化普遍有效（token 分布熵较低）；当 image token 占比低或使用低熵 codebook 时 KL 可能仍然安全；StableDRL 的无条件裁剪在纯 on-policy 阶段（ρ≈1）不必要地约束学习速度
+- **启示**: dLLM RL 的正则化策略已有四种选择：(1) 保留 KL（低熵 token 有效），(2) SFT loss 替代 KL（LaViDa-R1），(3) Shrinkage baseline 降低整体方差（EBPO），(4) Ratio 空间硬约束绕过 KL（StableDRL）。选择应根据 token 分布特性（熵、NLL、codebook 大小、image token 占比）自适应。理论上需要推导离散高熵分布下 KL estimator 的方差界
+- **相关论文**: [[2025-Lumina-DiMOO]], [[2026-LaViDa-R1]], [[2025-MMaDA]], [[2025-MMaDA-Parallel]], [[2026-EBPO]], [[2026-StableDRL]]
 
 ---
 
@@ -83,16 +84,16 @@
 - **支撑论文**: [[2026-EBPO]]（首次系统分析 GRPO saturated failure 问题，提出 shrinkage baseline 解决方案，G=8 时 +11.28%）
 - **可能解释**: (1) 收缩将极端估计（全 0）"拉"向全局先验，在 saturated failure 下产生 -S_q × μ_glob 的非零负梯度信号；(2) James-Stein 类收缩估计在同时估计多个均值时严格优于 sample mean（MSE 更低），这在统计学上有成熟理论保证；(3) Topic-coherent sampling 进一步降低 Welford 在线估计器在异质分布间的震荡方差
 - **例外情况**: (1) G≥32 时局部统计量已足够精确，收缩边际收益消失；(2) Gaussian 近似假设 θ_q ~ N(μ_glob, τ²) 在极度偏斜的 reward 分布（如 dLLM image token）下可能不最优；(3) Welford 在线估计器在训练早期策略快速变化时可能系统性滞后
-- **启示**: 多模态 RL 的 group size 天然受限（图像/视频生成 rollout 成本高），saturated failure 率更高（多模态推理更困难），是 shrinkage baseline 的天然应用场景。三种应对 saturated failure 的机制可分层组合：(1) EBPO shrinkage baseline（统计层面，从全失败 group 提取负向梯度，架构无关）；(2) LaViDa-R1 answer-forcing（生成层面，通过 dLLM inpainting 注入正向样本，dLLM 专有）；(3) Complementary masking w=1（估计层面，降低 likelihood 方差，dLLM 专有）。三者正交可叠加——shrinkage 改进 baseline，answer-forcing 改进 sample 质量，complementary masking 改进 likelihood 估计。**注意**: 目前仅 1 篇论文支撑且仅在纯文本 LLM 上验证，需等 dLLM 实验验证后升级为成熟 pattern
+- **启示**: 多模态 RL 的 group size 天然受限（图像/视频生成 rollout 成本高），saturated failure 率更高（多模态推理更困难），是 shrinkage baseline 的天然应用场景。三种应对 saturated failure 的机制可分层组合：(1) EBPO shrinkage baseline（统计层面，从全失败 group 提取负向梯度，架构无关）；(2) LaViDa-R1 answer-forcing（生成层面，通过 dLLM inpainting 注入正向样本，dLLM 专有）；(3) Complementary masking w=1（估计层面，降低 likelihood 方差，dLLM 专有）。三者正交可叠加——shrinkage 改进 baseline，answer-forcing 改进 sample 质量，complementary masking 改进 likelihood 估计。**注意**: StableDRL 的自归一化**不解决** saturated failure——当所有 advantage ≈ 0 时凸包退化为零向量附近，StableDRL 与 EBPO 解决正交问题（梯度尖峰 vs 信号消失），两者可叠加为"StableDRL-Complete"三层栈（详见 [[stabledrl-complete-three-layer-stack]]）。目前仅 1 篇论文支撑且仅在纯文本 LLM 上验证，需等 dLLM 实验验证后升级为成熟 pattern
 
 ---
 
 ### [P-RL-09] Off-Policy 处理存在离散过滤 vs 连续校正两种正交范式
 - **现象**: Step 3.5 Flash MIS-PO 用离散过滤（接受/拒绝二元决策）替代连续重要性加权，在 token 和轨迹层面仅对信赖域内样本优化，完全消除高方差权重项。GLM-5 IcePop 用连续 pop 函数平滑校正训练-推理策略不匹配（β=2, 非对称 clipping ε_low=0.2/ε_high=0.28）。两种方法从不同角度解决异步 RL 的 off-policy 问题，均在 frontier 规模验证（Step 3.5 196B/11B, GLM-5 744B/40B）
-- **支撑论文**: [[2026-Step35Flash]]（MIS-PO 离散过滤，IMO 85.4% / LiveCodeBench 86.4%）、[[2026-GLM-5]]（IcePop 连续校正，Intelligence Index 50 分开源 #1）
+- **支撑论文**: [[2026-Step35Flash]]（MIS-PO 离散过滤，IMO 85.4% / LiveCodeBench 86.4%）、[[2026-GLM-5]]（IcePop 连续校正，Intelligence Index 50 分开源第一）
 - **可能解释**: (1) 离散过滤更激进——完全丢弃 off-policy 样本消除方差，但牺牲信息（部分 off-policy 样本可能仍有价值）；(2) 连续校正更保守——保留所有样本但重加权，方差降低但不消除；(3) 两者的优劣取决于 off-policy 严重程度——极端 off-policy（长时 agent rollout）时离散过滤优势大，温和 off-policy（短文本生成）时连续校正信息利用率更高
 - **例外情况**: (1) 数据稀缺时离散过滤可能丢弃过多样本导致训练信号饥饿（需足够大 rollout 批次）；(2) MIS-PO 固定阈值假设任务同质——异构任务（数学推理 vs 创意写作）策略漂移速度不同，单一阈值可能失效；(3) 训练冷启动阶段策略接近随机，off-policy ratio 极端，两种方法都面临初始信号不足
-- **启示**: 对 dLLM RL，image token NLL>6 导致 off-policy 严重程度远超纯文本——MIS-PO 的离散过滤可能更适合 dLLM RL。两种范式与 EBPO shrinkage baseline 均正交（MIS-PO/IcePop 处理 importance weight 方差，EBPO 处理 advantage baseline 方差），三者可分层叠加。开放问题: 是否存在自适应方案（off-policy ratio 低时连续校正、高时离散过滤）？per-modality 阈值（text τ=0.9, image τ=0.7）是否可行？
+- **启示**: 对 dLLM RL，image token NLL>6 导致 off-policy 严重程度远超纯文本——MIS-PO 的离散过滤可能更适合 dLLM RL。两种范式与 EBPO shrinkage baseline 均正交（MIS-PO/IcePop 处理 importance weight 方差，EBPO 处理 advantage baseline 方差），三者可分层叠加。**StableDRL 的无条件裁剪提供第三种 off-policy 处理方式**——不离散丢弃也不连续校正，而是硬截断 ratio 到 [1-ε, 1+ε]。SPG 在 StableDRL 的压力测试中因隐式假设 ρ=1（完全忽略 off-policy）而崩溃（Figure 5），证明不做任何 off-policy 处理是不安全的。开放问题: 是否存在自适应方案（off-policy ratio 低时连续校正、高时离散过滤）？per-modality 阈值（text τ=0.9, image τ=0.7）是否可行？
 
 ---
 
@@ -110,4 +111,13 @@
 - **支撑论文**: [[2025-OpenMMReasoner]]（GSPO 序列级 ratio > GRPO token 级 ratio，在 9 个多模态推理 benchmark 上验证）、[[2026-Step35Flash]]（MIS-PO 轨迹级离散过滤，在 IMO/LiveCodeBench frontier 难度验证）
 - **可能解释**: Token 级 importance ratio 的乘积方差随序列长度 L 指数增长（∏ᵢ π/π_ref 的方差 ~ exp(L)），长 CoT 推理尤其严重。序列级 ratio 等价于 token 级的几何均值，个体波动被平滑。更小 ε clipping threshold 进一步限制更新幅度
 - **例外情况**: (1) 序列级 ratio 牺牲 token 级信用分配精细度——所有 token 获得相同 importance weight，关键推理步骤（<10% tokens）的梯度被稀释；(2) 仅 2 篇论文，且来自非常不同的场景（VLM reasoning vs frontier LLM training），需更多验证
-- **启示**: 对 dLLM RL 特别有意义——image token NLL>6 导致 token 级 ratio 爆炸更严重，序列级方案可能天然更适合。GSPO-MDM（将序列级 ratio 适配到 masked diffusion）是值得探索的方向。**注**: 当前为 pre-pattern，需 dLLM 上的实验验证后升级为成熟 pattern
+- **启示**: 对 dLLM RL 特别有意义——image token NLL>6 导致 token 级 ratio 爆炸更严重，序列级方案可能天然更适合。GSPO-MDM（将序列级 ratio 适配到 masked diffusion）是值得探索的方向。StableDRL 的无条件裁剪提供了第三种应对 token 级 ratio 爆炸的方案——不改变粒度（仍 token 级），而是直接硬截断异常值到 [1-ε, 1+ε]。与序列级 ratio 的 tradeoff 不同：序列级平滑方差但丢失 token 级信用分配，StableDRL 保留 token 级分辨率但仅截断极端值（ε=5 下实质是异常值过滤）。两者可组合——序列级 ratio + 无条件裁剪可能同时获得平滑方差和异常值防护。**注**: 当前为 pre-pattern，需 dLLM 上的实验验证后升级为成熟 pattern
+
+---
+
+### [P-RL-12] GRPO 更新公式的鲁棒化：无条件裁剪 + 自归一化（pre-pattern）
+- **现象**: StableDRL 识别出 GRPO 公式在 dLLM 中的两个具体漏洞：(1) 条件裁剪在 A<0, ρ>1+ε 时不裁剪（设计为"加速策略回归"），但 dLLM 的噪声 ρ̂ 欺骗条件裁剪产生梯度尖峰；(2) 固定 group-size 归一化（÷G）在 group 内 ρ̂ 同时偏大/偏小时放大梯度幅度波动。两者形成自强化循环（噪声→尖峰→策略漂移→更多噪声）。通过无条件裁剪（ρ̂ 始终限制在 [1-ε, 1+ε]）+ 自归一化（÷Σclip(ρ̂ᵢ) 替代 ÷G）打破循环，首次实现 dLLM 全参数 RL 训练 >1000 步
+- **支撑论文**: [[2026-StableDRL]]（首次诊断 GRPO 公式层面的 dLLM 适配漏洞，提出无条件裁剪+自归一化修复，LLaDA-8B GSM8K 84.2%, SDAR-8B AIME'24 16.7% 超越 AR Qwen3-8B 10.0%）
+- **可能解释**: (1) 无条件裁剪消除个体异常——不论 advantage 符号，ρ̂ 始终有界，切断噪声→尖峰环节；(2) 自归一化消除 group-level 波动——将更新约束在 per-sample 梯度的凸包内（||∇||≤B），解耦更新幅度与 group-scale 随机性；(3) 两者的修复来自经典 off-policy RL（V-trace 截断重要性加权 + 自归一化重要性采样），贡献本质是**诊断性**而非算法性——正确识别 GRPO 公式在 dLLM 噪声 ρ 场景下的两个具体漏洞
+- **例外情况**: (1) 仅一篇论文在纯文本推理任务上验证，多模态场景（image token NLL>6）未测试；(2) 自归一化丢失幅度信息——当策略真的大幅偏移时（legitimate large ρ），标准 GRPO 的幅度放大是正确行为，自归一化压制了这一信号；(3) 无条件裁剪在纯 on-policy 阶段（ρ≈1）不必要地约束学习速度；(4) ε=5 实质是异常值截断而非紧致信赖域（标准 PPO ε∈[0.1, 0.3]），"无条件裁剪"标签有一定误导性
+- **启示**: StableDRL 是 KB 中唯一修改 GRPO 更新公式本身的工作（其他改进都作用于公式的"输入"——likelihood 估计或 advantage baseline）。与 EBPO（advantage 方差）和 answer-forcing（探索失败）正交，三者可组合为三层 dLLM RL 稳定性栈，详见 [[stabledrl-complete-three-layer-stack]]。**注**: 当前为 pre-pattern（仅 1 篇论文），需多模态 dLLM 实验验证后升级为成熟 pattern

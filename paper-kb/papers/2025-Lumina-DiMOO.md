@@ -130,6 +130,7 @@ dLLM 统一模型的性能瓶颈不在架构（模态无关共享即可），而
 - `combines_with` → [[2025-SDAR-VL]]: DiMOO 的 ML-Cache（推理加速）与 SDAR-VL 的块状处理（训练稳定性）正交互补
 - `alternative_to` → [[2025-KimiK2.5]]: 统一模型路线分歧——DiMOO 离散扩散统一架构 vs K2.5 纯 AR MoE 多模态 + agentic；GRM（外部评估器）vs Self-GRPO（自评估）reward 策略对比
 - `combines_with` → [[2025-VTP]]: VTP 多目标语义增强 tokenizer 可替换 DiMOO 的 aMUSEd-VQ（纯重建），解决低级视觉任务语义不足问题，潜在提升 T2I 生成质量上界
+- `combines_with` → [[2026-Omni-Diffusion]]: Omni-Diffusion 的三模态扩展验证 masked diffusion 统一架构可 scale 到更多模态；DiMOO 的 ML-Cache 推理加速和 Self-GRPO 自评估可迁移到三模态场景
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

@@ -25,6 +25,7 @@ AR模型和扩散模型之间的性能差距并非架构本质差异，而是训
 - **继承自**: [[2025-LLaDA-V]] (扩散VLM基线), [[2025-LaViDa]] (扩散VLM先驱)
 - **对比**: [[2025-A2D-VL]] (同期工作，需要annealing策略), 传统AR-VLM (Qwen2.5-VL等)
 - **互补**: 可与任意AR-VLM/AR-LM结合，提供AR→Diffusion转换通用方案
+- **被诊断**: [[2026-NAP]]（NAP 诊断 Block Diffusion 半自回归为 Fast-DLM amplifying ARness 的实例）
 
 <!-- ==================== Level 2: 方法拆解 (重要论文, 15min) ==================== -->
 

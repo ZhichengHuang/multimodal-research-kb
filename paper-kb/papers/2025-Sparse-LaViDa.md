@@ -27,7 +27,7 @@ MDM 推理的核心低效在于每步处理大量冗余 mask token——这些 t
   - [[Block Diffusion]]（同为 MDM 加速方案，但 Block Diffusion 牺牲双向上下文强制 left-to-right 解码，无法支持 inpainting/infilling；Sparse-LaViDa 保留任意解码顺序）
   - [[2025-LaViDa]]（Prefix-DLM 仅缓存前缀 KV，response 部分仍需全计算；Sparse-LaViDa 进一步截断 response 中的 mask token）
   - [[2025-Lumina-DiMOO]]（ML-Cache 缓存稳定 token，与 Sparse-LaViDa 的 token 截断正交互补）
-- **互补**: 与 LaViDa Prefix-DLM 和 DiMOO ML-Cache 可叠加使用，实现三重加速（前缀缓存 + mask token 截断 + 稳定 token 缓存）
+- **互补**: 与 LaViDa Prefix-DLM 和 DiMOO ML-Cache 可叠加使用，实现三重加速（前缀缓存 + mask token 截断 + 稳定 token 缓存）；[[2026-NAP]]（mask token 截断加速 + NAP 每步多 token 并行正交叠加）；[[2026-Omni-Diffusion]]（推理加速技术可应用于三模态场景）
 
 <!-- ==================== Level 2: 方法拆解 (重要论文, 15min) ==================== -->
 

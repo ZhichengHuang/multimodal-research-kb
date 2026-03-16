@@ -25,6 +25,7 @@ aliases: [MMaDA, UniGRPO]
 - **继承自**: [[LLaDA]]（离散扩散语言模型，提供预训练权重）、[[Show-o]]（图像 tokenizer MAGVIT-v2）
 - **对比**: [[2026-LaViDa-R1]]（同为 dLLM RL，但方法设计不同）、[[d1]]（dLLM RL 先驱，仅单任务）、[[Janus]]（解耦编码统一模型）
 - **互补**: [[Transfusion]]（AR+Diffusion 混合路线 vs MMaDA 的纯 Diffusion 路线）
+- **被诊断**: [[2026-NAP]]（NAP 诊断 MMaDA 的 block-wise 解码为"加剧 ARness"的 Fast-DLM 方法——通过"先稳定前缀"获得加速，实质在 amplify AR 行为）
 
 <!-- ==================== Level 2: 方法拆解 (重要论文, 15min) ==================== -->
 
@@ -126,6 +127,8 @@ aliases: [MMaDA, UniGRPO]
 - `alternative_to` → [[2026-Beyond-LM]]: 统一模型路线之争——LLaDA 初始化纯离散扩散 + 模态无关全共享 vs 从零训练 AR+连续扩散混合 + modality-specific FFN + MoE
 - `alternative_to` → [[2025-KimiK2.5]]: 架构路线对立——dLLM (masked diffusion) vs AR-based MoE (1.04T, 自回归)；同样做跨模态 RL 但实现不同（UniGRPO vs GRM+Toggle RL）；K2.5 在 AR 上独立验证跨模态协同 (P-Uni-01)
 - `combines_with` → [[2025-VTP]]: VTP 语义增强 tokenizer 可作为 MAGVIT-v2 的升级替代方案，改善 MMaDA 的 T2I 质量（GenEval Position 0.20 等弱点可能部分源于 tokenizer 语义不足）
+- `is_extended_by` → [[2026-Omni-Diffusion]]: Omni-Diffusion 在 MMaDA 基础上扩展到三模态（text+image+speech），继承 masked diffusion 统一架构并添加 speech tokenizer + Special Token Pre-Infilling 输出格式控制
+- `is_extended_by` → [[2026-StableDRL]]: StableDRL 修改 GRPO 更新公式（无条件裁剪+自归一化）解决 UniGRPO 在 dLLM 中的训练不稳定问题，在 LLaDA-8B 上 GSM8K 73.4→84.2%
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

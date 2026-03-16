@@ -183,16 +183,17 @@
 
 #### [RL-2] 🔴 GRPO/PPO 如何适配多模态？
 - [RL-2a] 🟡 多模态采样的成本远高于纯文本，如何降低？
-  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator; Kimi K2.5 Toggle RL 从输出长度维度优化——交替预算约束/全长生成，输出 token 减少 25-30%（与 dLLM 特有技术正交的通用方案）; LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算（无似然度方案），同时 flow matching 轨迹拉直效应减少推理步数（代码 -41.8 步，推理 -159 步），进一步降低采样成本; Step 3.5 Flash MIS-PO 用离散过滤（接受/拒绝）替代连续重要性加权——完全消除高方差权重项，在 token 和轨迹层面限制优化在信赖域内; SPG 提供第六种范式——三明治 ELBO+EUBO bounds，对正 advantage 最大化 ELBO、负 advantage 最小化基于 Rényi divergence 的 EUBO，解决 ELBO 对负 advantage 的数学缺陷。SPG 的 block-wise masking 还揭示训练-推理分布对齐是被严重忽视的效率瓶颈（Countdown +23.9%）
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2026-Step35Flash]], [[2025-SPG]]
+  - 已有尝试: MMaDA UniGRPO 结构化随机 mask ratio 替代 Monte Carlo 128-sample; LaViDa-R1 complementary masking (w=1)——该技术源自 LaViDa 的 Complementary Masking 训练方法，后被扩展为 RL likelihood estimator; Kimi K2.5 Toggle RL 从输出长度维度优化——交替预算约束/全长生成，输出 token 减少 25-30%（与 dLLM 特有技术正交的通用方案）; LFPO 通过 Theorem 3.1 完全绕过 likelihood 计算（无似然度方案），同时 flow matching 轨迹拉直效应减少推理步数（代码 -41.8 步，推理 -159 步），进一步降低采样成本; Step 3.5 Flash MIS-PO 用离散过滤（接受/拒绝）替代连续重要性加权——完全消除高方差权重项，在 token 和轨迹层面限制优化在信赖域内; SPG 提供第六种范式——三明治 ELBO+EUBO bounds，对正 advantage 最大化 ELBO、负 advantage 最小化基于 Rényi divergence 的 EUBO，解决 ELBO 对负 advantage 的数学缺陷。SPG 的 block-wise masking 还揭示训练-推理分布对齐是被严重忽视的效率瓶颈（Countdown +23.9%）; StableDRL 提供第七种范式——**优化公式鲁棒化**，不改善 likelihood 或 advantage 估计质量，而是修改 GRPO 更新公式本身以容忍噪声 importance ratio（无条件裁剪 + 自归一化），首次实现 dLLM 全参数 RL 训练 >1000 步
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2026-Step35Flash]], [[2025-SPG]], [[2026-StableDRL]]
 - [RL-2b] 🔴 Group 构造: 同一图不同回答 vs 不同图？
 - [RL-2c] 🔴 高熵 token 分布下的 RL 正则化
   - MMaDA 保留 KL penalty, LaViDa-R1 发现 image token NLL>6 导致 KL estimator 方差极大、训练发散
   - LaViDa-R1 用 SFT loss 替代 KL 作为隐式正则化，有效但理论不完备
   - DiMOO Self-GRPO 保留 KL（与 LaViDa-R1 直接冲突），在 1024² 分辨率下稳定性未被充分验证
+  - StableDRL 的无条件裁剪提供第四条正则化路径——在 ratio 空间施加硬约束 [1-ε, 1+ε]，完全绕过 KL 估计，通过限制 importance ratio 范围隐式约束策略偏移速度。是唯一不需要任何分布估计的正则化方案
   - 根本问题: KL 约束对 dLLM 的高熵离散分布是否根本不合适？
-  - 潜在思路: 分 token 类型加权 KL, entropy-aware clipping, 自适应 KL 系数, 理论推导最优正则化形式
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]]
+  - 潜在思路: 分 token 类型加权 KL, entropy-aware clipping, 自适应 KL 系数, 理论推导最优正则化形式; 无条件裁剪（StableDRL）作为 KL 的替代或补充
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-StableDRL]]
 - [RL-2d] 🔴 Shrinkage-based advantage 估计在 dLLM 高熵 token 分布下的表现
   - EBPO 证明 James-Stein 收缩 baseline 在纯文本 RL 中严格优于 GRPO 的局部 group mean（MSE 降低），G=8 时 +11.28%
   - 但其 Gaussian 近似假设（θ_q ~ N(μ_glob, τ²)）在 dLLM 的高熵 image token 分布下是否成立未知（NLL>6，分布严重偏斜）
@@ -215,6 +216,7 @@
 - [RL-2g] 🔴 Velocity-based vs Likelihood-based dLLM RL 的系统对比
   - LFPO 的速度场修正（无似然度，精确梯度）和 UniGRPO/complementary masking 的似然度估计（近似，有方差）代表两条根本不同的优化路径
   - SPG 显著提升了 likelihood-based 方法的性能上界——通过三明治 ELBO+EUBO bounds 解决负 advantage 偏差，GSM8K +3.6%, Sudoku +27.0%（vs UniGRPO），使 likelihood-based vs velocity-based 的对比更加公平
+  - StableDRL 进一步证明 likelihood-based dLLM RL 可以全参数训练（之前 SPG/ESPO 需要 LoRA），缩小了与 LFPO velocity-based 路线的实用性差距。GSM8K 84.2% vs LFPO 79.6%、MATH500 41.8% vs 37.6%——likelihood-based + 全参数 RL 在当前基准上领先
   - 理论上 LFPO 消除了似然度估计方差，但 Theorem 3.1 依赖连续时间极限假设，少步推理（8-32 步）场景下离散化误差可能系统性偏大
   - Token 级 credit assignment 被牺牲——LFPO 在时间步级别操作速度残差，关键推理步骤仅涉及 2-3 个 token 时信号被平均化；likelihood-based 方法（包括 SPG）可通过 token 级 log prob 做细粒度归因
   - 需要在相同基座（LLaDA 8B / DiffuCoder）、相同任务、相同 reward 下做严格对比——精度 vs 方差 vs 计算成本 vs 推理步数的全面 Pareto 分析
@@ -244,6 +246,18 @@
   - 核心问题: 单一阈值是否适用于 reward 分布差异极大的多模态场景？是否需要 per-reward-type MIS-PO 阈值？
   - 潜在思路: uncertainty-weighted 阈值（根据各 reward 的置信区间动态调整）；compositional reward filtering（先一致性硬门 → 再 CLIP 过滤 → 最后 MIS-PO）
   - 相关论文: [[2026-Step35Flash]]
+- [RL-2p] 🔴 GRPO 更新公式的全参数 RL 鲁棒性
+  - StableDRL 首次实现 dLLM 全参数 RL 训练 >1000 步（此前所有方法用 LoRA 或 early stopping）。全参数 RL 的长度泛化更好（128/256/512 一致），但计算成本更高
+  - 核心问题: 何时应该用全参数 vs LoRA？两者的 Pareto 前沿（性能 vs 计算成本）是什么形状？
+  - 已有证据: StableDRL 全参数 GSM8K 84.2% vs ESPO/SPG LoRA 约 70-80%，全参数在长度泛化上更好
+  - 潜在思路: 系统性对比全参数 vs LoRA（不同 rank）在 GSM8K/MATH/Countdown 上的性能-成本 Pareto；是否存在 LoRA rank 阈值（超过后接近全参数效果）；NAP 并行推理轨迹 SFT 可作为 StableDRL 全参数 RL 的冷启动数据——并行数据提供更稳定的 policy 起点
+  - 相关论文: [[2026-StableDRL]], [[2025-SPG]], [[2026-NAP]]
+- [RL-2q] 🔴 块状扩散（Block Diffusion）的 RL 训练效率
+  - StableDRL 的阶梯注意力（Staircase Attention）通过双流输入 + 组合注意力掩码实现 O(1) 无泄露 ELBO 评估，首次为块状扩散模型（SDAR-8B）提供可行的 RL 训练方案
+  - 核心问题: 块状扩散 RL 的训练效率是否优于全注意力 dLLM RL？块状因果约束是否提供更好的 credit assignment？
+  - 已有证据: SDAR-8B + StableDRL AIME'24 16.7%（超越 AR Qwen3-8B 10.0%），说明块状扩散 RL 在前沿推理基准上有竞争力
+  - 潜在思路: SDAR-VL 的 ABNS/EMRS/PBNC 预训练稳定性技术 + StableDRL 的 RL 稳定性技术双层优化；阶梯注意力推广到其他块状扩散模型
+  - 相关论文: [[2026-StableDRL]], [[2025-SDAR-VL]]
 
 #### [RL-4] 🔴 轨迹级 RL vs Token 级 RL 的 Tradeoff
 - MMaDA-Parallel ParaRL 采用轨迹级优化（沿整个去噪轨迹应用 CLIP-based alignment reward）
@@ -275,8 +289,8 @@
 
 #### [RL-3] 🟡 RL 能提升多模态推理能力吗？
 - [RL-3a] 🟡 视觉推理 (图表/几何) 的 verifiable reward
-  - 已有尝试: MMaDA 对 GeoQA/CLEVR 用 correctness+CLIP reward, UniGRPO 提升 GSM8K +8.2; LaViDa-R1 在 MathVista +2.4; OpenMMReasoner GSPO 在 9 个 benchmark 平均 +11.6%; EBPO 在数学推理上 G=8 时 +11.28%（验证改进 advantage 估计对困难推理任务的显著效果，机制可迁移到多模态）; Kimi K2.5 视觉 RL 后文本基准微弱提升（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），方向性证据但效应量可能在噪声范围内; LFPO 在 LLaDA 8B 上 GSM8K +9.9%、MATH +7.0%，同时推理步数显著减少（-159 步），验证无似然度范式在推理任务上的有效性; SPG 在 LLaDA-8B-Instruct 上 GSM8K +3.6%, MATH500 +2.6%, Countdown +18.4%, Sudoku +27.0%（vs 前 SOTA），验证三明治 ELBO+EUBO bounds 在推理任务上的显著效果
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-OpenMMReasoner]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-SPG]]
+  - 已有尝试: MMaDA 对 GeoQA/CLEVR 用 correctness+CLIP reward, UniGRPO 提升 GSM8K +8.2; LaViDa-R1 在 MathVista +2.4; OpenMMReasoner GSPO 在 9 个 benchmark 平均 +11.6%; EBPO 在数学推理上 G=8 时 +11.28%（验证改进 advantage 估计对困难推理任务的显著效果，机制可迁移到多模态）; Kimi K2.5 视觉 RL 后文本基准微弱提升（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），方向性证据但效应量可能在噪声范围内; LFPO 在 LLaDA 8B 上 GSM8K +9.9%、MATH +7.0%，同时推理步数显著减少（-159 步），验证无似然度范式在推理任务上的有效性; SPG 在 LLaDA-8B-Instruct 上 GSM8K +3.6%, MATH500 +2.6%, Countdown +18.4%, Sudoku +27.0%（vs 前 SOTA），验证三明治 ELBO+EUBO bounds 在推理任务上的显著效果; **StableDRL 创下 dLLM RL 推理新 SOTA**: LLaDA-8B GSM8K 84.2%, MATH500 41.8%, Countdown 83.5%, Sudoku 91.5%（超越 ESPO 和 SPG），SDAR-8B AIME'24 16.7%（超越 AR Qwen3-8B 10.0%），首次实现全参数 RL 训练
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-OpenMMReasoner]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-SPG]], [[2026-StableDRL]]
 - [RL-3b] 🔴 RL 对 grounding 能力的影响
   - 相关论文: [[2026-LaViDa-R1]]
 - [RL-3c] 🔴 传统 VLM RL vs dLLM RL 的方法论差异
@@ -289,8 +303,8 @@
     - **Rollout 策略**: 传统 VLM 直接 ×16 采样；dLLM 需要覆盖去噪时间步（complementary masking 或随机 mask ratio）
   - 开放问题: 两者的 RL 方法能否互相借鉴？GSPO 的稳定性优势能否迁移到 dLLM？GSPO 能否适配 masked diffusion？
   - 潜在思路: 抽象出与架构无关的 PG 组件（advantage 估计、reward shaping、正则化）；GSPO-MDM（将 GSPO 的 group-based advantage 适配到 masked diffusion）；统一 Policy Gradient 框架
-  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO。LFPO 是第二个仅适用于 dLLM 的 RL 组件（继 answer-forcing 后）——Theorem 3.1 依赖离散 token 空间 + cross-entropy loss 特性，无法直接迁移到 AR 模型，进一步证实 dLLM RL 正在发展出独立于 AR RL 的方法论体系。Step 3.5 Flash MIS-PO 是第三个架构无关的 PG 改进组件——离散过滤（接受/拒绝）替代连续重要性加权，在 off-policy 严重时完全消除高方差权重项，与 EBPO shrinkage（advantage 方差）正交（MIS-PO 降低 importance weight 方差），两者可叠加。MIS-PO vs IcePop (GLM-5) 形成离散过滤 vs 连续校正两种 off-policy 处理范式。SPG 是第四个 dLLM 专有的 RL 组件——通过 Rényi divergence 推导 EUBO 实现三明治 bounds（依赖 masked diffusion 的 ELBO 结构），对负 advantage 提供数学上正确的惩罚信号，同时 block-wise masking 揭示训练-推理分布对齐的重要性
-  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-Qwen3-VL]], [[2026-Step35Flash]], [[2026-GLM-5]], [[2025-SPG]]
+  - **进展**: EBPO 的 shrinkage baseline 是首个与架构无关的 PG 改进组件——仅修改 advantage 估计中的 baseline 项，不依赖 AR 还是 masked diffusion 的 likelihood 估计方式，可直接移植到 GSPO/UniGRPO/Self-GRPO。LFPO 是第二个仅适用于 dLLM 的 RL 组件（继 answer-forcing 后）——Theorem 3.1 依赖离散 token 空间 + cross-entropy loss 特性，无法直接迁移到 AR 模型，进一步证实 dLLM RL 正在发展出独立于 AR RL 的方法论体系。Step 3.5 Flash MIS-PO 是第三个架构无关的 PG 改进组件——离散过滤（接受/拒绝）替代连续重要性加权，在 off-policy 严重时完全消除高方差权重项，与 EBPO shrinkage（advantage 方差）正交（MIS-PO 降低 importance weight 方差），两者可叠加。MIS-PO vs IcePop (GLM-5) 形成离散过滤 vs 连续校正两种 off-policy 处理范式。SPG 是第四个 dLLM 专有的 RL 组件——通过 Rényi divergence 推导 EUBO 实现三明治 bounds（依赖 masked diffusion 的 ELBO 结构），对负 advantage 提供数学上正确的惩罚信号，同时 block-wise masking 揭示训练-推理分布对齐的重要性。**StableDRL 是第五个 PG 改进组件**——架构感知但非架构专有，修改 GRPO 更新公式本身（无条件裁剪+自归一化）以容忍噪声 importance ratio。针对 dLLM 的噪声 ρ 设计，但数学上适用于任何含噪声 ratio 的 RL 场景。与 EBPO（advantage 方差）和 answer-forcing（探索失败）正交，可组合为三层稳定性栈（详见 [[stabledrl-complete-three-layer-stack]]）。首次实现 dLLM 全参数 RL 训练 >1000 步，GSM8K 84.2% / AIME'24 16.7% 创下 dLLM RL 推理 SOTA
+  - 相关论文: [[2025-OpenMMReasoner]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2025-KimiK2.5]], [[2026-LFPO]], [[2025-Qwen3-VL]], [[2026-Step35Flash]], [[2026-GLM-5]], [[2025-SPG]], [[2026-StableDRL]]
 
 ---
 
@@ -303,11 +317,12 @@
   - Beyond-LM 首次在统一模型中使用 flow matching（连续扩散），与 KB 中其他工作的 masked diffusion（离散扩散）形成对比
   - 但缺乏同等条件下的性能对比，无法判断连续 vs 离散哪个更优
   - 已有尝试:
-  - 相关论文: [[2026-Beyond-LM]]
+  - 相关论文: [[2026-Beyond-LM]], [[2026-Drifting]]
+  - Drifting Model 提出全新范式——将迭代步骤从推理时转移到训练时，通过反对称漂移场实现 1-NFE FID 1.54 SOTA。不依赖 SDE/ODE 理论，是 Flow Matching 和 DDPM 之外的第三条路线
 - [Diff-1b] 🟡 连续扩散 vs 离散扩散 (Masked Diffusion)
   - 离散扩散和 LLM 的 token 框架天然对齐
   - 连续扩散保留更多信息但需要架构改造
-  - 已有证据: MMaDA、LaViDa 系列、DiMOO 均验证离散 masked diffusion 在统一模型中可行且 competitive；DiMOO 在 1024² 分辨率 + GenEval 88% 进一步巩固离散路线
+  - 已有证据: MMaDA、LaViDa 系列、DiMOO 均验证离散 masked diffusion 在统一模型中可行且 competitive；DiMOO 在 1024² 分辨率 + GenEval 88% 进一步巩固离散路线；Omni-Diffusion 证明 masked diffusion 不受限于模态数量，可扩展到 text+image+speech 三模态
   - LaViDa 是首个将 dLLM 用于多模态理解的 VLM 家族（NeurIPS 2025 Spotlight），在两种 dLLM 骨干（LLaDA-8B, Dream-7B）上均验证方法通用性。Complementary Masking 改进了 masked diffusion 训练的基本效率问题（ScienceQA +67% on 200K subset）
   - LaViDa-O 在 1024² 分辨率 + 多任务场景下仍达 competitive（FID 6.68）
   - LLaDA-V 提供迄今最干净的控制变量对比: 理解端 dLLM 在知识/数学推理上系统性优于 AR (MMMU +3.2, MMMU-Pro +6.9)，在图表/文档理解上系统性弱于 AR (AI2D -3.3, DocVQA -2.3)。不仅验证可行性，更量化了优劣势边界
@@ -317,13 +332,20 @@
   - SDAR-VL 在 21 个基准上达到与 AR 基线相当的性能，并通过 ABNS/EMRS/PBNC 解决块状离散扩散的训练稳定性问题
   - VidLaDA 首次将 dLLM 扩展到视频理解: 长视频上 dLLM 优于 AR（LongVideoBench +3.2, MLVU +3.0），短视频时序任务 dLLM 弱于 AR（MVBench -10.2）。三重鲁棒性证据: 位置 variance <2% vs AR >10%，时间位置平稳 vs U 型，帧稀疏无损 vs 急剧下降。MARS-Cache 实现 12.5× 推理加速
   - XDLM 通过 stationary noise kernel 统一 MDLM (k=0) 和 UDLM (k=1)，证明纯 mask 噪声 (k=0) 不是离散扩散的最优选择——k=0.1 混合噪声在几乎不损失理解（54.110 vs MDLM 53.650）的前提下大幅提升少步生成质量（FID 54.1 vs MDLM 80.8）。在 LLaDA-8B 上 continual pretraining 验证（MBPP 32 步 15.0 vs 基线 6.8）。对 KB 中所有基于 MDLM 的工作有直接影响——k=0.1 kernel 可作为 drop-in 训练目标替换
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-LLaDA-V]], [[2025-ReDiff]], [[2026-Beyond-LM]], [[2025-SDAR-VL]], [[2025-VidLaDA]], [[2025-XDLM]]
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-LLaDA-V]], [[2025-ReDiff]], [[2026-Beyond-LM]], [[2025-SDAR-VL]], [[2025-VidLaDA]], [[2025-XDLM]], [[2026-Omni-Diffusion]]
 - [Diff-1b-1] 🔴 dLLM 信息容量上界悖论——理论与实验不一致
   - VidLaDA Proposition 3.2 证明 bidirectional decoding 信息容量上界**更低**（通过 Markov chain decomposition + Data Processing Inequality），但实验中 dLLM 性能更好
   - 悖论: 更低的信息容量上界意味着更少信息可用，逻辑上应是劣势而非优势。论文将其作为 dLLM 优势的理论依据存在逻辑断层
   - 正确解释可能是: dLLM 的优势来自"更均匀的信息分配"（每个 token 对等参与表征构建），而非"更高信息容量"
   - 核心需求: 建立区分"representation capacity"和"generation capacity"的理论框架——理解任务的性能取决于表征质量而非生成容量
   - 相关论文: [[2025-VidLaDA]]
+- [Diff-1b-2] 🔴 Pre-Infilling 作为 MDM 通用输出格式控制机制的潜力
+  - Omni-Diffusion 的 Special Token Pre-Infilling 利用 MDM 独有的初始序列可编辑特性——在初始全 mask 序列中预填 [BoS] token 控制文本/语音输出比例和位置
+  - 核心优势: AR 模型必须按序列顺序生成，无法预控制输出格式；MDM 可在初始 mask 序列任意位置预填特殊 token，实现"输出编排"
+  - 已有相关尝试: LaViDa FIM（通过前中后重排实现 infilling）、DiMOO `<end-of-line>`（保留 2D 结构）、LaViDa-O planning token——均属 MDM 输出控制的不同实例
+  - 开放问题: (1) 能否推广到图文交错生成（预填 [BoI]/[BoS]/[BoT] 控制多模态输出位置和比例）？(2) 能否用于结构化输出（预填 JSON key 的位置）？(3) 预填比例（如 25%/75% 文本/语音切分）是否需要自适应？
+  - 潜在思路: 学习型 pre-infilling 策略（模型自动决定预填位置和 token）；多轮对话中动态调整输出格式
+  - 相关论文: [[2026-Omni-Diffusion]], [[2025-LaViDa]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]]
 - [Diff-1c] 🟡 采样效率: 如何在统一模型中减少 diffusion 步数
   - Consistency model / distillation 是否适用
   - Few-step generation 对理解能力的影响
@@ -340,7 +362,9 @@
   - VidLaDA MARS-Cache: 帧级 chunk attention（±1 帧局部 O(n·k) vs 全局 O(n²)）+ adaptive anchor token 搜索 + 模态异步刷新（视觉慢/文本快，深层快/浅层慢），12.5× 加速，KB 中最高的单一加速方案。与 Prefix-DLM、ML-Cache 正交可叠加（理论 15-20×）
   - XDLM 少步高质量生成: 通过 k=0.1 混合噪声核训练，8-32 步即可获得高质量结果（ImageNet-1K 16 步 FID 25.77 vs MDLM 80.8），是推理加速的第六个正交维度——减少步数 2-4× 与上述每步加速技术正交叠加，理论总加速 30-100×
   - LFPO RL 轨迹拉直: 对比式速度修正使去噪路径更直，代码平均减少 41.8 步、推理减少 159 步（对比 AGRPO 在 MATH 上增加 +73.6 步），是第七个正交维度——后训练层面减步，与 XDLM 的预训练层面减步机制不同，两者可叠加
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-ReDiff]], [[2025-Sparse-LaViDa]], [[2025-DiffusionVL]], [[2025-SDAR-VL]], [[2025-VidLaDA]], [[2025-XDLM]], [[2026-LFPO]]
+  - Omni-Diffusion Position Penalty: 抑制 MDM 两端同时解码导致图像重复的推理技巧（γp=0.5），与上述加速技术正交
+  - Omni-Diffusion Adaptive Token Length Assignment: 根据模态间长度相关性自适应设置初始 mask 序列长度（TTS 3.5× text, ASR 0.2× speech），减少不必要的 mask token
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-ReDiff]], [[2025-Sparse-LaViDa]], [[2025-DiffusionVL]], [[2025-SDAR-VL]], [[2025-VidLaDA]], [[2025-XDLM]], [[2026-LFPO]], [[2026-Omni-Diffusion]]
 - [Diff-1c-1] 🔴 Register tokens 的最优数量和设计原则
   - Sparse-LaViDa 使用固定 64 个 register 作为被截断 mask token 的全局摘要，但这是经验选择（0→64 时 GenEval 0.76→0.78，FID 9.32→7.63）
   - 核心问题: 最优数量是否与截断比例、序列长度、模型容量相关？如何理论推导最优值？
@@ -352,6 +376,12 @@
   - 对需要 mask token 间交互的任务（如结构化生成）是否有系统性影响？
   - 潜在思路: (1) 推导 step-causal mask 下的 ELBO 界；(2) 分析不同 attention pattern 的加速-质量 tradeoff；(3) 系统评估对结构化生成任务的影响
   - 相关论文: [[2025-Sparse-LaViDa]]
+- [Diff-1c-3] 🔴 MDM 解码顺序偏置（两端向中间）对不同模态的影响
+  - Omni-Diffusion 发现 MDM 倾向于同时从序列两端向中间解码（因两端 token 上下文信息最丰富），在图像模态导致顶部和底部出现重复模式（raster scan 排列下）
+  - 论文通过 Position Penalty（推理早期缩小末尾 token logits）强制单向有序生成缓解此问题，与 PC-Sampler 从不同角度（位置校准解码偏置）独立发现类似现象
+  - 开放问题: (1) 这一偏置在文本模态是否导致"首尾 token 先解码、中间缺乏连贯性"？(2) 在语音模态是否导致"开头结尾先解码、中间韵律断裂"？(3) 不同模态是否需要不同的解码偏置校准策略？
+  - 潜在思路: 系统性实验测量不同模态的解码顺序偏置分布；模态感知的 Position Penalty（图像用空间 penalty，语音用时序 penalty，文本用语义依赖 penalty）
+  - 相关论文: [[2026-Omni-Diffusion]]
 - [Diff-1d] 🔴 dLLM 训练时的错误分布建模
   - ReDiff 暴露的核心问题：如何系统化建模推理时的错误分布？
   - 合成错误（Stage I 随机替换 + 事实错误注入）vs 模型特定错误（Stage II 在线自我纠错）的最优配比
@@ -400,6 +430,23 @@
   - 区分两种归因很重要: 若是目标过简单 → XDLM 混合噪声是正确方案；若是分布不匹配 → ReDiff 精炼训练可能更直接
   - 潜在思路: 设计对照实验——(1) MDLM + ReDiff 精炼（仅解决分布不匹配）vs (2) XDLM k=0.1（同时改变目标和分布）vs (3) XDLM + ReDiff（双层方案）。若 (1) 也消除饱和，说明分布不匹配是主因
   - 相关论文: [[2025-XDLM]], [[2025-ReDiff]]
+- [Diff-1l] 🔴 DLM 的 AR 解码收敛是否可在预训练阶段解决？并行结构化预训练数据的可行性和成本？
+  - NAP 诊断了 DLM 收敛为 AR-like 左到右解码的根因——训练数据的隐式顺序性（sequential dependence），但仅在后训练（~100K 样本）验证
+  - 核心问题: (1) 标准预训练语料（FineWeb 等）具有极强 SeqDep，完全重构预训练数据到并行结构代价巨大；(2) 并非所有文本都有自然的并行分解（叙述性文本天然顺序）；(3) 混合预训练（部分并行+部分标准）的最优比例和 curriculum 未知
+  - 潜在思路: 混合预训练（前期 100% 标准数据，后期渐增并行数据到 20%）；对特定任务型语料做并行重构（如多步数学证明→并行证明路径）；对 list-style 内容自动检测并重排为并行格式
+  - 与 Diff-1k 的关系: MDLM 饱和可能不仅是训练目标/分布不匹配问题，更是数据的隐式顺序结构限制了模型利用并行能力的学习空间（NAP 的第三种假说）
+  - 相关论文: [[2026-NAP]], [[2025-XDLM]], [[2025-ReDiff]]
+- [Diff-1m] 🔴 Parallel-Forced Decoding 的理论保证——均匀分配 unmask 预算是否为最优策略？
+  - NAP 的 Parallel-Forced Decoding 在宏观层面将每步 unmask 预算均匀分配到所有推理块，但缺乏理论保证
+  - 核心问题: (1) 均匀分配是否为最优？不同推理块的难度/长度不同，自适应分配可能更优；(2) 是否存在与 confidence-based 微观策略协同的最优宏观分配方案？(3) 当推理块间存在弱依赖（非完全���立）时，均匀分配可能次优
+  - 潜在思路: 基于块级 confidence 的自适应 unmask 预算分配；理论分析均匀分配在条件独立假设下的最优性；扩展到多模态场景（图像和文本作为不同并行流，分配比例不同）
+  - 相关论文: [[2026-NAP]]
+- [Diff-1n] 🟡 Fast-DLM 方法的 AR amplification 程度量化
+  - NAP 诊断现有 Fast-DLM 方法（block-wise 解码、early-commit 等）本质上是放大而非消除 AR-like 行为——通过"先稳定前缀再生成后续"获得加速
+  - 核心问题: 不同 Fast-DLM 方法（MMaDA block-wise, DiffusionVL Block Diffusion, SDAR-VL 块状扩散, Prophet early-commit）在 ARness 度量上的定量比较尚缺
+  - NAP 提供了度量工具（Global ARness@k, SeqDep），但仅在 LLaDA/Dream 基础模型上测量，未对各 Fast-DLM 方法做系统性 ARness 定量对比
+  - 潜在思路: 用 NAP 的 ARness 度量对 KB 中所有 Fast-DLM 方法做统一评估；分析 ARness 与实际推理质量的定量关系；设计"ARness-aware"的加速策略
+  - 相关论文: [[2026-NAP]], [[2025-MMaDA]], [[2025-DiffusionVL]], [[2025-SDAR-VL]]
 
 #### [Diff-2] 🔴 Diffusion 骨干架构演进
 - [Diff-2a] 🔴 DiT 成功的本质原因？Transformer 替代 UNet 的关键
@@ -495,13 +542,19 @@
   - AR+Diffusion (Transfusion, MetaMorph): 灵活, 各取所长, 但训练目标不统一
   - 纯AR离散化 (Chameleon, Emu3): 框架统一优雅, 但视觉离散化有损
   - 解耦编码 (Janus, SEED): 实用, 避免冲突, 但不够"统一"
-  - Diffusion原生: MMaDA 首次在 NeurIPS 级别验证 8B 规模可行；DiMOO 纯 VQ 极简架构达 GenEval 88%（超 FLUX.1-dev），LaViDa-O Elastic-MoT 达 89%（w/ reflection），证明 Diffusion 原生路线可 scale
+  - Diffusion原生: MMaDA 首次在 NeurIPS 级别验证 8B 规模可行；DiMOO 纯 VQ 极简架构达 GenEval 88%（超 FLUX.1-dev），LaViDa-O Elastic-MoT 达 89%（w/ reflection），证明 Diffusion 原生路线可 scale；Omni-Diffusion 首次将 dLLM 统一模型扩展到三模态（text+image+speech），验证 masked diffusion 可 scale 到更多模态
   - dLLM 纯理解验证: LLaDA-V 在控制变量下证明 dLLM 骨干做纯理解已优于 AR 骨干 (11/18 基准胜出)，为统一模型的理解端提供信心基础
   - Vision-first 子路线: Muddit 从预训练 T2I 模型（Meissonic MM-DiT）出发，1B+3.5M 达 GenEval 0.61 + 4-11x 推理加速，证明从视觉先验出发也可行，但文本能力受限（CLIP 77 token）→ 见 [Uni-1e]
   - AR-to-Diffusion 子路线: DiffusionVL 从预训练 AR VLM（Qwen2.5-VL-7B）扩散微调，738K 数据达 95% 性能。Block Diffusion 提供 AR-Diffusion 融合的中间范式。证明 AR 知识可高效迁移到扩散骨干，但自身训练增益 vs AR 知识继承的贡献未分离 → 见 [PT-6]
   - SDAR-VL 通过块状扩散 + 训练稳定性优化（ABNS/EMRS/PBNC），在 21 个基准上达到与 AR 基线相当的性能，进一步验证 dLLM 统一模型的可行性
-  - 已有尝试: LaViDa (首个 dLLM VLM 家族，路线 B 起点), MMaDA (diffusion-native 三任务 competitive), LaViDa-R1 (grounding specialist level), DiMOO (GenEval 88% 超越专用模型), LaViDa-O (Elastic-MoT 10.4B 多任务 SOTA), Muddit (Vision-first 1B 路线验证), LLaDA-V (dLLM 纯理解验证 11/18 超越 AR), DiffusionVL (AR→Diffusion 迁移, Block Diffusion), SDAR-VL (块状扩散训练稳定性)
-  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-Muddit]], [[2025-LLaDA-V]], [[2025-DiffusionVL]], [[2025-SDAR-VL]]
+  - 已有尝试: LaViDa (首个 dLLM VLM 家族，路线 B 起点), MMaDA (diffusion-native 三任务 competitive), LaViDa-R1 (grounding specialist level), DiMOO (GenEval 88% 超越专用模型), LaViDa-O (Elastic-MoT 10.4B 多任务 SOTA), Muddit (Vision-first 1B 路线验证), LLaDA-V (dLLM 纯理解验证 11/18 超越 AR), DiffusionVL (AR→Diffusion 迁移, Block Diffusion), SDAR-VL (块状扩散训练稳定性), Omni-Diffusion (首个三模态 dLLM any-to-any 模型)
+  - 相关论文: [[2025-LaViDa]], [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2025-LaViDa-O]], [[2025-Muddit]], [[2025-LLaDA-V]], [[2025-DiffusionVL]], [[2025-SDAR-VL]], [[2026-Omni-Diffusion]]
+- [Uni-1a-1] 🔴 三模态（及更多模态）联合训练的模态竞争/遗忘问题
+  - Omni-Diffusion 的三阶段渐进训练（Visual-Language → +Speech → +SDVI）在后期 stage 引入新模态时可能遗忘早期对齐——论文通过保留早期数据部分缓解，但缺乏系统化设计
+  - 核心问题: 模态引入顺序、数据配比、token 数量平衡如何系统化设计？三种模态 token 信息密度差异巨大（text 高语义密度 vs image 空间分布 vs speech 12.5 Hz 时序密集），统一 mask ratio 是否合理？
+  - speech token（12.5 Hz → 数百个 token/秒）远多于 text token，可能导致训练梯度被 speech token 主导
+  - 潜在思路: per-modality mask ratio；模态加权 loss；MoE 路由实现模态容量分配；课程学习的模态引入顺序理论推导
+  - 相关论文: [[2026-Omni-Diffusion]], [[2025-MMaDA]], [[2025-Lumina-DiMOO]]
 - [Uni-1b] 🔴 AR + Diffusion 的融合细节
   - 在哪一层融合？token level vs feature level
   - Loss 权重如何平衡？动态 vs 静态
@@ -581,8 +634,8 @@
 - [Uni-5a] 🟡 统一模型如何做 alignment？
   - 理解和生成分别对齐 vs 联合对齐
   - 已有方案: MMaDA 提供首个 diffusion-native 全链路（预训练→Mixed CoT SFT→UniGRPO RL）; LaViDa-R1 提供统一 PG 框架（SFT+GRPO+self-distillation）; DiMOO 提供四阶段管线 + Self-GRPO 联合 RL; EBPO 的 shrinkage baseline 可作为架构无关的 advantage 估计改进，直接嵌入任何 GRPO 变体; LFPO 提供无似然度的速度场修正范式，天然规避 KL 在高熵 image token 下的方差问题; [[2026-GLM-5]]（cross-stage distillation: SFT→RL 知识蒸馏）
-  - dLLM RL 已形成五种范式: 似然度近似(UniGRPO) / 似然度降方差(complementary masking) / 似然度 bounds(SPG 三明治 ELBO+EUBO) / advantage 降方差(EBPO) / 无似然度(LFPO)
-  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2026-LFPO]], [[2026-GLM-5]], [[2025-SPG]]
+  - dLLM RL 已形成七种范式: 似然度近似(UniGRPO) / 似然度降方差(complementary masking) / 似然度 bounds(SPG 三明治 ELBO+EUBO) / advantage 降方差(EBPO) / 无似然度(LFPO) / off-policy 离散过滤(MIS-PO) / 优化公式鲁棒化(StableDRL 无条件裁剪+自归一化)
+  - 相关论文: [[2025-MMaDA]], [[2026-LaViDa-R1]], [[2025-Lumina-DiMOO]], [[2026-EBPO]], [[2026-LFPO]], [[2026-GLM-5]], [[2025-SPG]], [[2026-Step35Flash]], [[2026-StableDRL]]
 - [Uni-5b] 🟡 统一模型的 reward 如何设计？→ 连接到 [RL-1c]
   - 理解正确性 + 生成质量 + 一致性 的多目标 reward
   - 已有方案: MMaDA Diversified Reward (correctness/format/CLIP/ImageReward), LaViDa-R1 Multi-Reward (correctness/IoU/EditScore), DiMOO Self-GRPO (模型自身理解能力作为隐式 reward)

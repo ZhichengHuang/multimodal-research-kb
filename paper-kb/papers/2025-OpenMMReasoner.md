@@ -30,6 +30,7 @@ aliases: [OpenMMReasoner]
 - **互补**:
   - **与 dLLM RL 工作的互补性**: OpenMMReasoner 在传统 VLM 上验证了"RL 提升多模态推理"的有效性，与 dLLM RL 工作形成**架构互补**——证明 RL 对多模态推理的提升不依赖特定架构
   - **与 [[2025-dMLLM-TTS]] 的互补**: OpenMMReasoner 是训练时 RL 优化，dMLLM-TTS 是推理时 test-time scaling，两者可组合
+  - **与 [[2026-EBPO]] 的互补**: EBPO 的 shrinkage baseline 是 GSPO advantage 估计的替代改进——GSPO 降低 ratio 方差，EBPO 降低 baseline 方差，两者正交可叠加
 
 <!-- ==================== Level 2: 方法拆解 (重要论文, 15min) ==================== -->
 

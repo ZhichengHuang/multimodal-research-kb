@@ -114,6 +114,7 @@ dLLM 的双向生成能力（bidirectional inpainting）不仅是推理时的优
 - `combines_with` → [[2025-SDAR-VL]]: SDAR-VL 的块状扩散训练稳定性优化（ABNS/EMRS/PBNC）可迁移到 LaViDa-R1 骨干的预训练阶段
 - `alternative_to` → [[2025-KimiK2.5]]: 多模态 RL 方案对比——dLLM RL (answer-forcing + complementary masking) vs AR RL (GRM + Toggle RL)；K2.5 在 AR MoE 上独立验证跨模态正迁移
 - `alternative_to` → [[2025-SPG]]: 改善 dLLM likelihood 估计的不同维度——complementary masking 降低 MC 方差（覆盖范围），SPG block-wise masking 对齐推理结构（分布匹配）+ 三明治 bounds 解决负 advantage 偏差；两者可组合
+- `combines_with` → [[2026-StableDRL]]: StableDRL 解决梯度尖峰不稳定（GRPO 公式鲁棒化），LaViDa-R1 的 answer-forcing 解决训练信号消失（探索失败）——两个正交训练病理的正交修复，可组合为三层稳定性栈的 Layer 1+3
 
 <!-- ==================== Level 3: 完整分析 (核心论文, 30min) ==================== -->
 

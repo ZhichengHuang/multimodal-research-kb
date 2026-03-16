@@ -16,8 +16,8 @@
 ---
 
 ### [P-Uni-01] 统一多模态模型中的跨模态训练产生正向协同
-- **现象**: MMaDA Mixed Long-CoT SFT 阶段，文本推理、多模态理解、T2I 生成的所有指标同步提升（Figure 6），没有观察到显著 seesaw 效应。LaViDa-R1 的统一后训练在数学推理、grounding、image editing 上均取得提升。DiMOO Self-GRPO 联合优化 T2I+理解，验证「一个 loss 同时提升两种能力」。Kimi K2.5 在 AR-based MoE 模型（1.04T, 32B 激活）上观察到视觉 RL 提升文本基准（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），将此 pattern 从 dLLM 特有推广为统一多模态模型的通用性质
-- **支撑论文**: [[2025-MMaDA]]（Figure 6 跨模态协同效应）、[[2026-LaViDa-R1]]（统一 PG 框架多任务 RL 正向转移）、[[2025-Lumina-DiMOO]]（Self-GRPO 联合优化 T2I+理解）、[[2025-KimiK2.5]]（AR MoE 模型上视觉 RL→文本基准正向迁移，首次在非 dLLM 架构上定量验证）
+- **现象**: MMaDA Mixed Long-CoT SFT 阶段，文本推理、多模态理解、T2I 生成的所有指标同步提升（Figure 6），没有观察到显著 seesaw 效应。LaViDa-R1 的统一后训练在数学推理、grounding、image editing 上均取得提升。DiMOO Self-GRPO 联合优化 T2I+理解，验证「一个 loss 同时提升两种能力」。Kimi K2.5 在 AR-based MoE 模型（1.04T, 32B 激活）上观察到视觉 RL 提升文本基准（MMLU-Pro +1.7%, GPQA-Diamond +2.1%），将此 pattern 从 dLLM 特有推广为统一多模态模型的通用性质。Omni-Diffusion 将协同效应扩展到三模态（text+image+speech），三阶段渐进训练中 speech-to-image 质量（CLIP-T 0.225）接近 text-to-image（0.235），验证跨模态对齐在更多模态下仍有效
+- **支撑论文**: [[2025-MMaDA]]（Figure 6 跨模态协同效应）、[[2026-LaViDa-R1]]（统一 PG 框架多任务 RL 正向转移）、[[2025-Lumina-DiMOO]]（Self-GRPO 联合优化 T2I+理解）、[[2025-KimiK2.5]]（AR MoE 模型上视觉 RL→文本基准正向迁移，首次在非 dLLM 架构上定量验证）、[[2026-Omni-Diffusion]]（三模态跨模态对齐有效性，speech-to-image ≈ text-to-image 质量）
 - **可能解释**: 统一训练目标让文本/图像 token 共享底层抽象推理能力（逻辑链构建、证据整合、假设验证）；CoT 格式的学习可迁移至图像生成的推理；多任务训练提供正则化防过拟合；MoE 架构中跨模态知识在共享层（attention）传播而专用层（expert FFN）保持不干扰
 - **例外情况**: (1) 任务比例严重失衡时某任务可能欠训练；(2) RL 阶段的梯度冲突可能削弱协同效应；(3) K2.5 的 +1.7% 效应量较小，可能在噪声范围内（无标准差和多次重复实验），因果推断不充分——继续训练的一般性提升和训练数据知识重叠是混淆变量；(4) dLLM 中的协同（联合优化）vs AR 中的协同（顺序训练后的迁移）机制可能不同
 - **启示**: 跨模态正向协同不局限于 dLLM 统一模型，是统一多模态模型的通用性质。不需要引入解耦来避免冲突，但需仔细设计任务采样比例和 reward scale。开放问题：迁移的方向性（视觉→文本 vs 文本→视觉）是否对称？
@@ -75,3 +75,12 @@
 - **可能解释**: (1) 预训练模型的初始化决定了模型的"能力天花板"——LLM 预训练提供强推理能力但弱视觉先验，T2I 预训练反之；(2) LLM-first 路线可利用大规模语言预训练的知识，Vision-first 路线利用高质量视觉先验；(3) 两种路线的最终收敛点可能相同（足够数据和计算下），但路径和效率不同
 - **例外情况**: (1) 参数量不对称——LLM-first 均为 8-10B，Vision-first 仅 1B Muddit，公平对比缺失；(2) DiffusionVL 的 AR→Diffusion 转换提供了第三条路径（AR 初始化 + 扩散微调）；(3) Beyond-LM 从零训练（无 LLM/T2I 初始化）也达到 competitive 性能
 - **启示**: 当前 LLM-first 路线在文本理解和推理上有明显优势，是主流选择。Vision-first 路线的价值在于视觉生成质量——未来可探索两种路线的融合（如 LLM 骨干 + T2I adapter）。选择应基于目标任务的模态偏好：理解为主选 LLM-first，生成为主选 Vision-first
+
+---
+
+### [P-Uni-08] 三模态联合 mask prediction 可行但面临 token 数量不平衡
+- **现象**: Omni-Diffusion 首次将 masked diffusion 从 text+image 扩展到 text+image+speech 三模态 any-to-any 模型。通过统一 mask token 预测建模三种模态的联合分布，ASR WER 7.05（超越 AnyGPT 8.50），TTS WER 3.07（超越 GLM-4-Voice 5.64），视觉理解 competitive（POPE 76.6）。三阶段渐进训练（Visual-Language → +Speech → +SDVI）有效对齐三种模态
+- **支撑论文**: [[2026-Omni-Diffusion]]（首个三模态 dLLM any-to-any 模型，text+image+speech 统一建模）、[[2025-MMaDA]]（text+image 双模态 dLLM 统一模型，验证 masked diffusion 统一建模可行性）
+- **可能解释**: (1) 所有模态共享同一个 mask prediction 目标和 transformer 参数空间，迫使模型学习跨模态对齐的统一语义表示；(2) 三阶段渐进训练避免一次性引入所有模态导致的训练不稳定；(3) Attenuated Tail-Pad Masking（γ=0.6）缓解 pad token 对训练信号的稀释
+- **例外情况**: (1) speech token（12.5 Hz → 数百个 token/秒）远多于 text token，可能导致训练梯度被 speech token 主导；(2) 三种模态 token 信息密度差异巨大（text 高语义密度 vs image 空间分布 vs speech 时序密集），统一 mask ratio 是否合理存疑；(3) 后期 stage 引入新模态时可能遗忘早期对齐；(4) 仅在 Dream-7B 骨��上验证，更大规模未知
+- **启示**: masked diffusion 的统一建模能力不受限于模态数量，可继续扩展到 video、3D 等模态。但 token 数量不平衡是核心挑战——需要 per-modality mask ratio、模态加权 loss 或 MoE 路由实现模态容量分配。与 P-Uni-01 的跨模态正向协同一致，三模态场景下协同效应仍然存在

@@ -31,6 +31,7 @@ aliases: ["Beyond-LM", "Multimodal-Pretraining-Scratch"]
   - vs [[2025-Muddit]]: 从零训练（第四条路线）vs Vision-first 初始化
 - **互补**:
   - 与 [[2026-LaViDa-R1]]: 预训练发现（视觉:语言 51:1）可指导 RL 数据配比
+  - 与 [[2026-Drifting]]: Drifting 的 one-step 生成范式可作为 Beyond-LM flow matching 连续扩散的替代/补充方案
   - 与 [[2025-LLaDA-V]]: 共享 SigLIP2 编码器技术
 
 <!-- ==================== Level 2: 方法拆解 (重要论文, 15min) ==================== -->

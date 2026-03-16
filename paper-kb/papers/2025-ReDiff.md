@@ -24,7 +24,7 @@ aliases: [ReDiff]
 ## 与已有工作的关系
 - **继承自**: [[2025-LLaDA-V]]（直接基于 LLaDA-V 作为 backbone，继承 masked diffusion 架构和 SigLIP2 视觉编码器），[[2025-LaViDa]]（继承 Complementary Masking 技术思想，扩展到 revision training），[[LLaDA]]（通过 LLaDA-V 间接继承 LLaDA-8B masked diffusion 骨干）
 - **对比**: [[2025-LLaDA-V]]（直接性能对比，+11.2 CLAIR 提升，核心差异是"passive denoising"vs"active refining"），[[2025-MMaDA]]（同为 dLLM 后训练增强，ReDiff 聚焦"错误修正"vs MMaDA 聚焦"奖励优化"），[[2026-LaViDa-R1]]（后训练方法对比，ReDiff 用 expert correction vs LaViDa-R1 用 answer-forcing）
-- **互补**: [[2025-LaViDa]]（ReDiff 的 active refining 验证了 LaViDa Prefix-DLM 的隐含假设——双向注意力可用于生成中的 token refinement），[[2026-LaViDa-R1]]（ReDiff 的 revision training 可与 LaViDa-R1 的 answer-forcing 结合），[[2025-Lumina-DiMOO]]（ReDiff 的 aggressive parallelization 与 DiMOO 的 ML-Cache 正交互补）
+- **互补**: [[2025-LaViDa]]（ReDiff 的 active refining 验证了 LaViDa Prefix-DLM 的隐含假设——双向注意力可用于生成中的 token refinement），[[2026-LaViDa-R1]]（ReDiff 的 revision training 可与 LaViDa-R1 的 answer-forcing 结合），[[2025-Lumina-DiMOO]]（ReDiff 的 aggressive parallelization 与 DiMOO 的 ML-Cache 正交互补），[[2026-NAP]]（ReDiff 精炼训练 + NAP 并行数据正交互补，形成三层方案：噪声核+数据+训练策略），[[2026-Omni-Diffusion]]（ReDiff 精炼训练可应用于 Omni-Diffusion 的多模态生成质量提升）
 
 <!-- ==================== Level 2: 方法拆解 (重要论文, 15min) ==================== -->
 
